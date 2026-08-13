@@ -1,0 +1,188 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Play, Eye, Heart, Check } from 'lucide-react';
+import { api } from '../../services/api';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+import styles from './AnimeDetails.module.css';
+
+const AnimeDetails = () => {
+  const { id } = useParams();
+  const [animeInfo, setAnimeInfo] = useState(null);
+  const [episodes, setEpisodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
+  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      setLoading(true);
+      // Fetch secuencial para evitar rate limit de Jikan
+      const info = await api.getAnimeInfo(id);
+      await new Promise(r => setTimeout(r, 400));
+      const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
+      
+      setAnimeInfo(info);
+      setEpisodes(eps);
+      setLoading(false);
+    };
+    fetchInfo();
+  }, [id]);
+
+  const handleClearWatched = () => {
+    // Filtrar para quitar todos los de este anime
+    const newWatched = watchedEpisodes.filter(id => !id.startsWith(`${animeInfo.id}-`));
+    setWatchedEpisodes(newWatched);
+    
+    // También limpiamos el anime de "Continuar viendo" y "Animes vistos"
+    setContinueWatching(continueWatching.filter(a => String(a.id) !== String(animeInfo.id)));
+    setWatchedAnimes(watchedAnimes.filter(a => String(a.id) !== String(animeInfo.id)));
+  };
+
+  if (loading) {
+    return <div className={styles.loading}>Cargando información del anime...</div>;
+  }
+
+  if (!animeInfo) {
+    return <div className={styles.loading}>Error al cargar el anime.</div>;
+  }
+
+  const isFavorite = favoriteAnimes.some(a => a.id === animeInfo.id);
+
+  const handleToggleFavorite = () => {
+    if (isFavorite) {
+      setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== animeInfo.id));
+    } else {
+      setFavoriteAnimes([{
+        id: animeInfo.id,
+        title: animeInfo.title,
+        image: animeInfo.image,
+      }, ...favoriteAnimes]);
+    }
+  };
+
+  const handleToggleEpisodeWatched = (e, epId) => {
+    e.preventDefault(); // Evitar que navegue al episodio
+    e.stopPropagation();
+    const globalEpId = `${animeInfo.id}-${epId}`;
+    
+    if (watchedEpisodes.includes(globalEpId)) {
+      const newWatched = watchedEpisodes.filter(id => id !== globalEpId);
+      setWatchedEpisodes(newWatched);
+      
+      // Si ya no queda NINGÚN episodio visto de este anime, lo quitamos de "Continuar Viendo"
+      const hasWatchedAny = newWatched.some(id => id.startsWith(`${animeInfo.id}-`));
+      if (!hasWatchedAny) {
+        setContinueWatching(continueWatching.filter(a => String(a.id) !== String(animeInfo.id)));
+        setWatchedAnimes(watchedAnimes.filter(a => String(a.id) !== String(animeInfo.id)));
+      }
+    } else {
+      setWatchedEpisodes([globalEpId, ...watchedEpisodes]);
+    }
+  };
+
+  return (
+    <div className={styles.detailsContainer}>
+      {/* Cabecera / Portada / Info */}
+      <div className={styles.header}>
+        <div className={styles.coverWrapper}>
+          <img src={animeInfo.image} alt={animeInfo.title} className={styles.coverImage} />
+        </div>
+        
+        <div className={styles.info}>
+          <h1 className={styles.title}>{animeInfo.title}</h1>
+          
+          <div className={styles.meta}>
+            <span className={styles.status}>{animeInfo.status}</span>
+            <button 
+              className={`${styles.favoriteToggle} ${isFavorite ? styles.isFavorite : ''}`}
+              onClick={handleToggleFavorite}
+              title="Añadir a favoritos"
+            >
+              <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
+              {isFavorite ? 'En Favoritos' : 'Añadir a Favoritos'}
+            </button>
+          </div>
+
+          <div className={styles.tags}>
+            {animeInfo.genres?.map(genre => (
+              <span 
+                key={genre} 
+                className={styles.tag} 
+                onClick={() => navigate(`/catalog?genre=${encodeURIComponent(genre)}`)}
+                style={{ cursor: 'pointer' }}
+                title={`Ver catálogo de ${genre}`}
+              >
+                {genre}
+              </span>
+            ))}
+          </div>
+
+          <p className={styles.synopsis}>{animeInfo.description}</p>
+        </div>
+      </div>
+
+      {/* Lista de Episodios */}
+      <div className={styles.episodesSection}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Episodios ({episodes.length})</h2>
+          
+          {/* Botón para limpiar vistos */}
+          {episodes.some(ep => watchedEpisodes.includes(`${animeInfo.id}-${ep.id}`)) && (
+            <button 
+              onClick={handleClearWatched}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'rgba(30, 41, 59, 0.8)', color: '#cbd5e1', fontSize: '0.875rem', fontWeight: 500, borderRadius: '0.5rem', border: '1px solid #334155', cursor: 'pointer' }}
+              title="Marcar todos como no vistos"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Limpiar vistos
+            </button>
+          )}
+        </div>
+        <div className={styles.episodesGrid}>
+          {episodes.map(ep => {
+            const globalEpId = `${animeInfo.id}-${ep.id}`;
+            const isEpWatched = watchedEpisodes.includes(globalEpId);
+            
+            return (
+              <Link 
+                to={`/watch/${animeInfo.id}/${ep.id}`} 
+                key={ep.id}
+                className={`glass-panel ${styles.episodeCard} ${isEpWatched ? styles.episodeWatched : ''}`}
+                title={ep.title}
+              >
+                <div className={styles.epInfo}>
+                  <div className={styles.epNumber}>{ep.title}</div>
+                  {isEpWatched && (
+                    <span className={styles.watchedText}>
+                      <Check size={14} />
+                      Visto
+                    </span>
+                  )}
+                </div>
+                
+                <div className={styles.playOverlay}>
+                  <Play size={24} />
+                </div>
+
+                <button 
+                  className={`${styles.epWatchBtn} ${isEpWatched ? styles.isWatchedBtn : ''}`}
+                  onClick={(e) => handleToggleEpisodeWatched(e, ep.id)}
+                  title={isEpWatched ? "Marcar como no visto" : "Marcar como visto"}
+                >
+                  <Eye size={20} />
+                </button>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AnimeDetails;

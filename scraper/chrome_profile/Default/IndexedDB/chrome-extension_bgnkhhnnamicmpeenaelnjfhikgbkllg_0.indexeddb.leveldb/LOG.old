@@ -1,0 +1,16 @@
+2026/08/12-22:05:00.070 4ea4 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\chrome_profile\Default\IndexedDB\chrome-extension_bgnkhhnnamicmpeenaelnjfhikgbkllg_0.indexeddb.leveldb/MANIFEST-000001
+2026/08/12-22:05:00.071 4ea4 Recovering log #100
+2026/08/12-22:05:00.072 4ea4 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\chrome_profile\Default\IndexedDB\chrome-extension_bgnkhhnnamicmpeenaelnjfhikgbkllg_0.indexeddb.leveldb/000100.log 
+2026/08/12-22:05:00.072 4ea4 Delete type=2 #97
+2026/08/12-22:05:00.073 4ea4 Delete type=2 #98
+2026/08/12-22:05:00.172 4ea4 Level-0 table #106: started
+2026/08/12-22:05:00.175 4ea4 Level-0 table #106: 631 bytes OK
+2026/08/12-22:05:00.177 4ea4 Delete type=0 #100
+2026/08/12-22:05:00.177 4ea4 Manual compaction at level-0 from '\x00\x18\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at '\x00\x18\x00\x00\x05' @ 4759 : 1
+2026/08/12-22:05:00.178 4ea4 Compacting 1@0 + 2@1 files
+2026/08/12-22:05:00.202 4ea4 Generated table #107@0: 1692 keys, 2121242 bytes
+2026/08/12-22:05:00.212 4ea4 Generated table #108@0: 571 keys, 542572 bytes
+2026/08/12-22:05:00.212 4ea4 Compacted 1@0 + 2@1 files => 2663814 bytes
+2026/08/12-22:05:00.212 4ea4 compacted to: files[ 0 2 1 0 0 0 0 ]
+2026/08/12-22:05:00.213 4ea4 Delete type=2 #106
+2026/08/12-22:05:00.213 4ea4 Manual compaction at level-0 from '\x00\x18\x00\x00\x05' @ 4759 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at (end)

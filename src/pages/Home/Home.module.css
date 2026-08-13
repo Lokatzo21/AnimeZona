@@ -1,0 +1,61 @@
+.homeContainer {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+.contextMenu {
+  position: absolute;
+  z-index: 9999;
+  border-radius: var(--border-radius-sm);
+  padding: 0.5rem;
+  min-width: 150px;
+}
+
+.contextMenuItem {
+  background: transparent;
+  color: var(--danger);
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.contextMenuItem:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.allTimeSection {
+  margin-top: 4rem;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 2rem;
+}
+
+.gridTitle {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  padding-left: 0.5rem;
+  border-left: 4px solid var(--primary-accent);
+}
+
+.animeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1.5rem 1rem;
+}
+
+@media (min-width: 768px) {
+  .animeGrid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2rem 1.5rem;
+  }
+}
+
+.loadingText {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  padding: 1rem 0;
+}

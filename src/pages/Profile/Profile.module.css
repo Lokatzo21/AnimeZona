@@ -1,0 +1,380 @@
+.profileContainer {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: var(--bg-dark-secondary);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--glass-border);
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--bg-dark-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.username {
+  font-size: 2.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.emailText {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.stats {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.editBtn {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.editBtn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: var(--primary-accent-light);
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(5px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modalContent {
+  background: var(--bg-dark-secondary);
+  border: 1px solid var(--glass-border);
+  padding: 2rem;
+  border-radius: var(--border-radius-lg);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+
+.modalContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modalContent::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.modalContent::-webkit-scrollbar-thumb {
+  background: var(--primary-accent);
+  border-radius: 4px;
+}
+
+.modalContent::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-accent-light);
+}
+
+.modalContent h2 {
+  margin-bottom: 0.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formGroup label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.input {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  color: white;
+  padding: 12px;
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+}
+
+.input:focus {
+  border-color: var(--primary-accent-light);
+}
+
+.avatarGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.avatarOption {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: var(--transition-fast);
+  opacity: 0.7;
+}
+
+.avatarOption:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.avatarOption.selected {
+  opacity: 1;
+  border-color: var(--primary-accent-light);
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(147, 51, 234, 0.5);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.cancelBtn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.cancelBtn:hover {
+  color: white;
+  background: rgba(255,255,255,0.1);
+}
+
+.saveBtn {
+  background: var(--primary-accent);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.saveBtn:hover {
+  background: var(--primary-accent-light);
+}
+
+.tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 2rem;
+}
+
+.tabBtn {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: var(--transition-fast);
+}
+
+.tabBtn:hover {
+  color: var(--text-primary);
+}
+
+.tabBtn.active {
+  color: var(--primary-accent-light);
+  border-bottom-color: var(--primary-accent-light);
+}
+
+.sectionTitle {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.emptyMsg {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+}
+
+.grid > * {
+  width: 100% !important;
+}
+
+/* Cuenta / Logout */
+.accountSection {
+  max-width: 600px;
+}
+
+.accountCard {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
+  padding: 2rem;
+  border-radius: var(--border-radius-md);
+}
+
+.accountInfo p {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+.accountInfo p strong {
+  color: var(--text-primary);
+  margin-right: 0.5rem;
+}
+
+.logoutWrapper {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+.logoutRedBtn {
+  background: rgba(255, 68, 68, 0.1);
+  color: #ff4444;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  padding: 12px 24px;
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.logoutRedBtn:hover {
+  background: #ff4444;
+  color: white;
+}
+
+.logoutConfirmBox {
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  padding: 1.5rem;
+  border-radius: var(--border-radius-sm);
+}
+
+.logoutConfirmBox p {
+  color: white;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+}
+
+.logoutActions {
+  display: flex;
+  gap: 1rem;
+}
+
+.cancelLogoutBtn {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.cancelLogoutBtn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.confirmLogoutBtn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-fast);
+}
+
+.confirmLogoutBtn:hover {
+  background: #cc0000;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+  .tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .tabBtn {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+  }
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  .avatarGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

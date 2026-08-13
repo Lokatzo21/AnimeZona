@@ -1,0 +1,19 @@
+{
+  "name": "anime-scraper",
+  "version": "1.0.0",
+  "description": "AnimeFLV Scraper for Supabase",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "gui": "node gui-scraper/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "pg": "^8.23.0",
+    "puppeteer": "^23.1.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
