@@ -11,9 +11,9 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   
   // Local storage para animes favoritos y ocultos
-  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
-  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [hiddenAnimes = [], setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
+  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, anime: null, section: null });
 
   useEffect(() => {

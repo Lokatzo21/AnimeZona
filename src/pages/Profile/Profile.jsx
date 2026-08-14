@@ -9,10 +9,10 @@ import styles from './Profile.module.css';
 const Profile = () => {
   const navigate = useNavigate();
   const { user, updateProfile, signOut } = useAuth();
-  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
-  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [hiddenAnimes = [], setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
+  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [watchedAnimes = [], setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const [activeTab, setActiveTab] = useState('historial');
 
   useEffect(() => {

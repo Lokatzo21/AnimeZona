@@ -11,7 +11,11 @@ export function useLocalStorage(key, initialValue) {
     }
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      if (item) {
+        const parsed = JSON.parse(item);
+        return parsed !== null ? parsed : initialValue;
+      }
+      return initialValue;
     } catch (error) {
       console.error(error);
       return initialValue;
@@ -24,11 +28,13 @@ export function useLocalStorage(key, initialValue) {
     try {
       setStoredValue(prevStoredValue => {
         const valueToStore = value instanceof Function ? value(prevStoredValue) : value;
+        const finalValue = valueToStore !== null ? valueToStore : initialValue;
+        
         if (typeof window !== "undefined") {
-          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+          window.localStorage.setItem(key, JSON.stringify(finalValue));
           // Emitir evento custom para sincronizar en la misma pestaña
           window.dispatchEvent(new CustomEvent('local-storage-sync', {
-            detail: { key, newValue: valueToStore }
+            detail: { key, newValue: finalValue }
           }));
 
           // Sincronizar hacia arriba (Supabase) con DEBOUNCE para evitar rate limits
@@ -41,7 +47,7 @@ export function useLocalStorage(key, initialValue) {
                   supabase.from('user_sync').upsert({
                     user_id: user.id,
                     key: key,
-                    value: valueToStore
+                    value: finalValue
                   }).then(({ error }) => {
                     if (error) console.error("Error sincronizando hacia arriba", error);
                   });
@@ -50,7 +56,7 @@ export function useLocalStorage(key, initialValue) {
             });
           }, 3000); // 3 segundos de debounce
         }
-        return valueToStore;
+        return finalValue;
       });
     } catch (error) {
       console.error(error);
@@ -61,14 +67,23 @@ export function useLocalStorage(key, initialValue) {
     // Escuchar cambios desde otras pestañas
     const handleStorageChange = (e) => {
       if (e.key === key) {
-        setStoredValue(e.newValue ? JSON.parse(e.newValue) : initialValue);
+        if (e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            setStoredValue(parsed !== null ? parsed : initialValue);
+          } catch {
+            setStoredValue(initialValue);
+          }
+        } else {
+          setStoredValue(initialValue);
+        }
       }
     };
 
     // Escuchar cambios en la misma pestaña
     const handleCustomSync = (e) => {
       if (e.detail.key === key) {
-        setStoredValue(e.detail.newValue);
+        setStoredValue(e.detail.newValue !== null ? e.detail.newValue : initialValue);
       }
     };
 
