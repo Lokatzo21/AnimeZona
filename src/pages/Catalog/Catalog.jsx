@@ -21,8 +21,8 @@ const Catalog = () => {
   const [hasMore, setHasMore] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
   
-  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
+  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [hiddenAnimes = [], setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   
   const loaderRef = useRef(null);
 

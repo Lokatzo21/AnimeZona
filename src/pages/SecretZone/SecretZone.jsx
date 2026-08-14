@@ -4,7 +4,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './SecretZone.module.css';
 
 const SecretZone = () => {
-  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
+  const [secretLikes = [], setSecretLikes] = useLocalStorage('secretLikes', []);
 
   useEffect(() => {
     document.title = 'Secreto | Anime';

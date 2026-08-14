@@ -11,11 +11,11 @@ const AnimeDetails = () => {
   const [animeInfo, setAnimeInfo] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
-  const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
-  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [secretLikes = [], setSecretLikes] = useLocalStorage('secretLikes', []);
+  const [watchedEpisodes = [], setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
+  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [watchedAnimes = [], setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const navigate = useNavigate();
   const { showToast, showConfirm } = useUI();
   

@@ -14,10 +14,10 @@ const Watch = () => {
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState('sub'); // 'sub', 'latino', 'castellano'
-  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
-  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
-  const [videoProgress, setVideoProgress] = useLocalStorage('videoProgress', {});
+  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [watchedEpisodes = [], setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
+  const [watchedAnimes = [], setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [videoProgress = {}, setVideoProgress] = useLocalStorage('videoProgress', {});
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
   const [promptShownForEp, setPromptShownForEp] = useState(false);
