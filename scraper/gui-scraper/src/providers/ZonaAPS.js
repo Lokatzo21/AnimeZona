@@ -166,6 +166,20 @@ class ZonaAPSProvider extends BaseProvider {
         const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara', 'gupload'];
 
         for (let attempt = 0; attempt < 20; attempt++) { 
+            // Intentar hacer clic en el botón de play por si el video no carga el mp4 hasta interactuar
+            try {
+                await targetPage.evaluate(() => {
+                    const clickPlay = (doc) => {
+                        const playBtn = doc.querySelector('.jw-icon-display') || doc.querySelector('.jw-display-icon-container') || doc.querySelector('.vjs-big-play-button');
+                        if (playBtn && playBtn.offsetHeight > 0) playBtn.click();
+                    };
+                    clickPlay(document);
+                    document.querySelectorAll('iframe').forEach(ifr => {
+                        try { clickPlay(ifr.contentWindow.document); } catch(e) {}
+                    });
+                });
+            } catch(e) {}
+
             const directVideo = await targetPage.evaluate(() => {
                 const videos = Array.from(document.querySelectorAll('video'));
                 for (const v of videos) {

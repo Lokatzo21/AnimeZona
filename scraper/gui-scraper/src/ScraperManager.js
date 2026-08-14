@@ -27,6 +27,10 @@ class ScraperManager {
   }
 
   async initBrowser() {
+    if (this.browser && !this.browser.isConnected()) {
+      this.browser = null; // El usuario cerró Chrome manualmente
+    }
+
     if (!this.browser) {
       global.logToUI('Iniciando navegador (Edge/Chrome)...', 'info');
       
