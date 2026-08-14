@@ -36,7 +36,7 @@ const Watch = () => {
   const handleVideoLoaded = () => {
     if (promptShownForEp) return; // Ya se le preguntó para este episodio
     const key = `${id}-${episode}`;
-    const progress = videoProgress[key];
+    const progress = videoProgress?.[key];
     if (progress && progress > 5) { // Si vio más de 5 segundos
       setSavedTime(progress);
       setShowResumePrompt(true);
@@ -55,7 +55,7 @@ const Watch = () => {
       lastSavedTime.current = currentTime;
       const key = `${id}-${episode}`;
       setVideoProgress(prev => ({
-        ...prev,
+        ...(prev || {}),
         [key]: currentTime
       }));
     }
@@ -282,7 +282,7 @@ const Watch = () => {
             <div className={styles.playerContainer}>
               <div className={styles.videoWrapper}>
                 {activeServer ? (
-                  activeServer.url.includes('.mp4') ? (
+                  activeServer?.url?.includes('.mp4') ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
