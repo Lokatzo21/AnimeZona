@@ -47,11 +47,23 @@ const Watch = () => {
     }
   };
 
+  // Efecto para capturar el progreso si la sincronización de Supabase llega tarde
+  useEffect(() => {
+    const key = `${id}-${episode}`;
+    const progress = videoProgress?.[key];
+    if (progress && progress > 5 && !promptShownForEp && nativeVideoRef.current && nativeVideoRef.current.readyState >= 1) {
+      setSavedTime(progress);
+      setShowResumePrompt(true);
+      setPromptShownForEp(true);
+      nativeVideoRef.current.pause();
+    }
+  }, [videoProgress, episode, id, promptShownForEp]);
+
   const handleTimeUpdate = () => {
     if (!nativeVideoRef.current) return;
     const currentTime = nativeVideoRef.current.currentTime;
-    // Guardar progreso cada 5 segundos
-    if (Math.abs(currentTime - lastSavedTime.current) > 5) {
+    // Guardar progreso cada 15 segundos
+    if (Math.abs(currentTime - lastSavedTime.current) > 15) {
       lastSavedTime.current = currentTime;
       const key = `${id}-${episode}`;
       setVideoProgress(prev => ({

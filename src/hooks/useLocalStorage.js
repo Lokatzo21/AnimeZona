@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 
+// Guardar los timers de debounce a nivel de módulo
+const syncTimers = {};
+
 export function useLocalStorage(key, initialValue) {
   // Estado para guardar nuestro valor
   const [storedValue, setStoredValue] = useState(() => {
@@ -28,20 +31,24 @@ export function useLocalStorage(key, initialValue) {
             detail: { key, newValue: valueToStore }
           }));
 
-          // Sincronizar hacia arriba (Supabase) sin bloquear la UI
-          import('../services/supabase').then(({ supabase }) => {
-            supabase.auth.getUser().then(({ data: { user } }) => {
-              if (user) {
-                supabase.from('user_sync').upsert({
-                  user_id: user.id,
-                  key: key,
-                  value: valueToStore
-                }).then(({ error }) => {
-                  if (error) console.error("Error sincronizando hacia arriba", error);
-                });
-              }
+          // Sincronizar hacia arriba (Supabase) con DEBOUNCE para evitar rate limits
+          if (syncTimers[key]) clearTimeout(syncTimers[key]);
+          
+          syncTimers[key] = setTimeout(() => {
+            import('../services/supabase').then(({ supabase }) => {
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user) {
+                  supabase.from('user_sync').upsert({
+                    user_id: user.id,
+                    key: key,
+                    value: valueToStore
+                  }).then(({ error }) => {
+                    if (error) console.error("Error sincronizando hacia arriba", error);
+                  });
+                }
+              });
             });
-          });
+          }, 3000); // 3 segundos de debounce
         }
         return valueToStore;
       });
