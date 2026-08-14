@@ -95,6 +95,25 @@ class ScraperManager {
       throw e; // Propagar error para que el server.js lo atrape
     }
   }
+
+  async startScrapeSingle({ url, title, episode, provider }) {
+    await this.initDatabase();
+    await this.initBrowser();
+
+    const scraper = this.getProvider(url, provider);
+    
+    global.logToUI(`Usando módulo: ${scraper.name}`, 'info');
+    
+    try {
+      if (!scraper.scrapeSingle) {
+        throw new Error(`El proveedor ${scraper.name} no soporta scraping individual todavía.`);
+      }
+      await scraper.scrapeSingle(url, title, parseInt(episode, 10) || 1);
+    } catch (e) {
+      global.logToUI(`Error en el proceso de scraping individual: ${e.message}`, 'error');
+      throw e; // Propagar error para que el server.js lo atrape
+    }
+  }
 }
 
 // Exportamos un singleton

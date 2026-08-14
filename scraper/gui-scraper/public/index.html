@@ -34,6 +34,15 @@
         <form id="scrapeForm" class="flex flex-col gap-4">
             
             <div class="flex flex-col gap-1">
+                <label class="text-sm font-semibold text-slate-300">Modo de Extracción</label>
+                <div class="flex gap-2">
+                    <button type="button" id="modeComplete" class="flex-1 bg-purple-600 text-white rounded p-2 text-sm font-bold border border-purple-500">Temporada Completa</button>
+                    <button type="button" id="modeSingle" class="flex-1 bg-slate-700 text-slate-300 rounded p-2 text-sm font-bold border border-slate-600 hover:bg-slate-600">Episodio Individual</button>
+                </div>
+                <input type="hidden" id="scrapeMode" value="complete">
+            </div>
+
+            <div class="flex flex-col gap-1">
                 <label class="text-sm font-semibold text-slate-300">Sitio a Scrapear</label>
                 <select id="provider" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <option value="animeonline">AnimeOnline Ninja (Predeterminado)</option>
@@ -41,8 +50,8 @@
                 </select>
             </div>
 
-            <div class="flex flex-col gap-1">
-                <label class="text-sm font-semibold text-slate-300">URL del Anime</label>
+            <div class="flex flex-col gap-1" id="urlContainer">
+                <label class="text-sm font-semibold text-slate-300" id="urlLabel">URL del Anime (Página Principal)</label>
                 <input type="text" id="url" required placeholder="https://ww3.animeonline.ninja/online/..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
             </div>
 
@@ -51,8 +60,8 @@
                 <input type="text" id="title" required placeholder="Ej: horimiya" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
             </div>
 
-            <div class="flex flex-col gap-1">
-                <label class="text-sm font-semibold text-slate-300">Empezar desde el Episodio</label>
+            <div class="flex flex-col gap-1" id="episodeContainer">
+                <label class="text-sm font-semibold text-slate-300" id="episodeLabel">Empezar desde el Episodio</label>
                 <input type="number" id="startEpisode" value="1" min="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
             </div>
 
@@ -98,6 +107,31 @@
         const terminal = document.getElementById('terminal');
         const form = document.getElementById('scrapeForm');
         const startBtn = document.getElementById('startBtn');
+        const modeComplete = document.getElementById('modeComplete');
+        const modeSingle = document.getElementById('modeSingle');
+        const scrapeMode = document.getElementById('scrapeMode');
+        const urlLabel = document.getElementById('urlLabel');
+        const urlInput = document.getElementById('url');
+        const episodeLabel = document.getElementById('episodeLabel');
+
+        // Toggle Modes
+        modeComplete.addEventListener('click', () => {
+            scrapeMode.value = 'complete';
+            modeComplete.className = 'flex-1 bg-purple-600 text-white rounded p-2 text-sm font-bold border border-purple-500';
+            modeSingle.className = 'flex-1 bg-slate-700 text-slate-300 rounded p-2 text-sm font-bold border border-slate-600 hover:bg-slate-600';
+            urlLabel.innerText = 'URL del Anime (Página Principal)';
+            urlInput.placeholder = 'https://ww3.animeonline.ninja/online/...';
+            episodeLabel.innerText = 'Empezar desde el Episodio';
+        });
+
+        modeSingle.addEventListener('click', () => {
+            scrapeMode.value = 'single';
+            modeSingle.className = 'flex-1 bg-purple-600 text-white rounded p-2 text-sm font-bold border border-purple-500';
+            modeComplete.className = 'flex-1 bg-slate-700 text-slate-300 rounded p-2 text-sm font-bold border border-slate-600 hover:bg-slate-600';
+            urlLabel.innerText = 'URL del Episodio (Página del reproductor)';
+            urlInput.placeholder = 'https://ww3.animeonline.ninja/episodio/solo-leveling-cap-13/';
+            episodeLabel.innerText = 'Número Exacto del Episodio';
+        });
         
         function appendLog(message, type) {
             const el = document.createElement('div');
@@ -123,16 +157,19 @@
             const title = document.getElementById('title').value;
             const startEpisode = document.getElementById('startEpisode').value;
             const provider = document.getElementById('provider').value;
+            const mode = document.getElementById('scrapeMode').value;
 
             startBtn.disabled = true;
             startBtn.innerHTML = "⏳ Procesando...";
             startBtn.classList.add('opacity-70');
 
             appendLog(`=================================`, "info");
+            appendLog(`Modo: ${mode === 'single' ? 'EPISODIO INDIVIDUAL' : 'TEMPORADA COMPLETA'}`, "info");
             appendLog(`Enviando tarea al servidor backend...`, "info");
 
             try {
-                const res = await fetch('/api/scrape', {
+                const endpoint = mode === 'single' ? '/api/scrape-single' : '/api/scrape';
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url, title, startEpisode, provider })

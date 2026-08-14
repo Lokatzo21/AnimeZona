@@ -53,12 +53,31 @@ app.post('/api/scrape', async (req, res) => {
   }
 
   // Responder rápido que la tarea ha comenzado
-  res.json({ message: 'Scraping iniciado', status: 'running' });
+  res.json({ message: 'Scraping de temporada iniciado', status: 'running' });
 
   try {
-    global.logToUI(`Iniciando tarea para: ${title}`, 'success');
+    global.logToUI(`Iniciando tarea (TEMPORADA) para: ${title}`, 'success');
     await ScraperManager.startScrape({ url, title, startEpisode, provider });
     global.logToUI(`🎉 Proceso completado para: ${title}`, 'success');
+  } catch (error) {
+    global.logToUI(`❌ Error crítico: ${error.message}`, 'error');
+  }
+});
+
+app.post('/api/scrape-single', async (req, res) => {
+  const { url, title, startEpisode, provider } = req.body;
+  
+  if (!url || !title || !startEpisode) {
+    return res.status(400).json({ error: 'Faltan campos requeridos (url, title, episode)' });
+  }
+
+  // Responder rápido que la tarea ha comenzado
+  res.json({ message: 'Scraping de episodio individual iniciado', status: 'running' });
+
+  try {
+    global.logToUI(`Iniciando tarea (EPISODIO ${startEpisode}) para: ${title}`, 'success');
+    await ScraperManager.startScrapeSingle({ url, title, episode: startEpisode, provider });
+    global.logToUI(`🎉 Episodio ${startEpisode} completado para: ${title}`, 'success');
   } catch (error) {
     global.logToUI(`❌ Error crítico: ${error.message}`, 'error');
   }
