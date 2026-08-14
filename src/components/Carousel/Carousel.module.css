@@ -25,6 +25,8 @@
   scroll-behavior: smooth;
   padding: 1rem 0.5rem;
   width: 100%;
+  flex: 1;
+  min-width: 0;
   -webkit-overflow-scrolling: touch;
   /* Hide scrollbar */
   -ms-overflow-style: none;

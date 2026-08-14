@@ -129,27 +129,24 @@ const Home = () => {
       </Carousel>
 
 
-      {/* Animes Recomendados (De todos los animes existentes - Grid) */}
-      <section className={styles.allTimeSection}>
-        <h2 className={styles.gridTitle}>Animes Recomendados (Catálogo Global)</h2>
+      {/* Animes Recomendados (De todos los animes existentes - Carousel) */}
+      <Carousel title="Animes Recomendados (Catálogo Global)">
         {loading ? (
           <p className={styles.loadingText}>Cargando catálogo...</p>
         ) : (
-          <div className={styles.animeGrid}>
-            {allTimeAnime
-              .filter(a => !hiddenAnimes.some(h => h.id === a.id))
-              .map(anime => (
-              <AnimeCard 
-                key={`alltime-${anime.id}`}
-                anime={anime}
-                isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
-                onToggleFavorite={handleToggleFavorite}
-                onHide={handleHide}
-              />
-            ))}
-          </div>
+          allTimeAnime
+            .filter(a => !hiddenAnimes.some(h => h.id === a.id))
+            .map(anime => (
+            <AnimeCard 
+              key={`alltime-${anime.id}`}
+              anime={anime}
+              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
+              onToggleFavorite={handleToggleFavorite}
+              onHide={handleHide}
+            />
+          ))
         )}
-      </section>
+      </Carousel>
 
       {/* Menú Contextual (Custom) */}
       {contextMenu.visible && (
