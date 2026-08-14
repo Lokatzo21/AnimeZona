@@ -86,6 +86,15 @@ const Watch = () => {
       nativeVideoRef.current.currentTime = 0;
       nativeVideoRef.current.play();
     }
+    
+    // Forzar el guardado de progreso en 0 inmediatamente
+    lastSavedTime.current = 0;
+    const key = `${id}-${episode}`;
+    setVideoProgress(prev => ({
+      ...(prev || {}),
+      [key]: 0
+    }));
+    
     setShowResumePrompt(false);
   };
 
