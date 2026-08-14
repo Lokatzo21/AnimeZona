@@ -67,6 +67,9 @@
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition-fast);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 .favoriteToggle:hover {
@@ -229,11 +232,25 @@
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.5rem;
   }
   
   .coverWrapper {
-    width: 200px;
+    width: 180px;
     margin: 0 auto;
+  }
+
+  .title {
+    font-size: 1.8rem;
+    text-align: center;
+  }
+
+  .meta {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .tags {
+    justify-content: center;
   }
 }

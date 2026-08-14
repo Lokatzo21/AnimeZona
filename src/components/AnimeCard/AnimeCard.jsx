@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Heart, Play, X } from 'lucide-react';
 import styles from './AnimeCard.module.css';
+import { useUI } from '../../contexts/UIContext';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWatch, onContextMenu, onHide, onRestore, onRemoveContinue }) => {
   const navigate = useNavigate();
+  const { showToast, showConfirm } = useUI();
+  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
   const [confirmHide, setConfirmHide] = useState(false);
+  
+  const pressTimer = useRef(null);
+  const isLongPress = useRef(false);
 
   const handleContextMenu = (e) => {
     if (onContextMenu) {
@@ -24,6 +31,49 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
 
   const handleMouseLeave = () => {
     if (confirmHide) setConfirmHide(false);
+    cancelPress();
+  };
+
+  const startPress = (e) => {
+    if (e.button && e.button !== 0) return; // Ignore right clicks
+    isLongPress.current = false;
+    const duration = isFavorite ? 5000 : 3000;
+    
+    pressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      const isSecret = secretLikes.some(a => a.id === anime.id);
+      if (!isSecret) {
+        setSecretLikes(prev => [{ id: anime.id, title: anime.title, image: anime.image }, ...prev]);
+        showToast("Listo :)");
+      } else {
+        showToast("Ya está en tus secretos");
+      }
+    }, duration);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  const handleFavoriteClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isLongPress.current) {
+      isLongPress.current = false;
+      return;
+    }
+
+    if (isFavorite) {
+      showConfirm("¿Estás seguro que deseas quitar este anime de tus favoritos?", () => {
+        if (onToggleFavorite) onToggleFavorite(anime);
+      });
+    } else {
+      if (onToggleFavorite) onToggleFavorite(anime);
+    }
   };
 
   return (
@@ -101,11 +151,12 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
           {onToggleFavorite !== undefined && (
             <button 
               className={`${styles.favoriteBtn} ${isFavorite ? styles.isFavorite : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (onToggleFavorite) onToggleFavorite(anime);
-              }}
+              onPointerDown={startPress}
+              onPointerUp={cancelPress}
+              onPointerLeave={cancelPress}
+              onPointerCancel={cancelPress}
+              onClick={handleFavoriteClick}
+              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
               title={isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
             >
               <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />

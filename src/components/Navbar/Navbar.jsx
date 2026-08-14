@@ -65,6 +65,17 @@ const Navbar = () => {
     navigate('/');
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      if (searchQuery.trim().toLowerCase() === 'secreto') {
+        navigate('/secret');
+        setSearchQuery('');
+        setSearchResults([]);
+        setIsMobileMenuOpen(false);
+      }
+    }
+  };
+
   const filteredResults = searchResults.filter(a => !hiddenAnimes.some(h => h.id === a.id));
 
   return (
@@ -78,10 +89,71 @@ const Navbar = () => {
         <div className={`${styles.navLinks} ${isMobileMenuOpen ? styles.mobileOpen : ''}`}>
           <Link to="/" className={styles.link} onClick={() => setIsMobileMenuOpen(false)}>Inicio</Link>
           <Link to="/catalog" className={styles.link} onClick={() => setIsMobileMenuOpen(false)}>Catálogo</Link>
+          
+          {/* Búsqueda en Móvil */}
+          <div className={`${styles.searchContainer} ${styles.mobileSearchOnly}`}>
+            <Search size={18} className={styles.searchIcon} />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+              <input 
+                type="text" 
+                placeholder="Buscar animes..." 
+                className={styles.searchInput}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+              {searchQuery.length > 0 && (
+                <button 
+                  className={styles.clearSearchBtn}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  title="Borrar búsqueda"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            
+            {/* Dropdown de Búsqueda Móvil */}
+            {searchQuery.trim().length > 2 && (
+              <div className={`glass-panel ${styles.searchResults}`}>
+                {isSearching ? (
+                  <div className={styles.searchLoading}>Buscando...</div>
+                ) : filteredResults.length > 0 ? (
+                  filteredResults.map(anime => (
+                    <div 
+                      key={anime.id} 
+                      className={styles.searchResultItem}
+                      onClick={() => handleResultClick(anime.id)}
+                    >
+                      <div className={styles.imageWrapper}>
+                        <img src={anime.image} alt={anime.title} className={styles.searchResultImage} />
+                        <button 
+                          className={`${styles.searchFavBtn} ${favoriteAnimes.some(a => a.id === anime.id) ? styles.isFav : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(anime);
+                          }}
+                          title="Añadir a favoritos"
+                        >
+                          <Heart size={12} fill={favoriteAnimes.some(a => a.id === anime.id) ? "currentColor" : "none"} />
+                        </button>
+                      </div>
+                      <span className={styles.searchResultTitle}>{anime.title}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.searchLoading}>No se encontraron animes.</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className={styles.navActions}>
-          <div className={styles.searchContainer}>
+          <div className={`${styles.searchContainer} ${styles.desktopSearchOnly}`}>
             <Search size={18} className={styles.searchIcon} />
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input 
@@ -90,6 +162,7 @@ const Navbar = () => {
                 className={styles.searchInput}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
               {searchQuery.length > 0 && (
                 <button 

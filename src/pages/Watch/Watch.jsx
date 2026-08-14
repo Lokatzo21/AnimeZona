@@ -17,9 +17,66 @@ const Watch = () => {
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [videoProgress, setVideoProgress] = useLocalStorage('videoProgress', {});
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const [savedTime, setSavedTime] = useState(0);
+  const [promptShownForEp, setPromptShownForEp] = useState(false);
   const playerRef = useRef(null);
   const sidebarListRef = useRef(null);
   const activeEpisodeRef = useRef(null);
+  const nativeVideoRef = useRef(null);
+  const lastSavedTime = useRef(0);
+
+  useEffect(() => {
+    setPromptShownForEp(false);
+    setShowResumePrompt(false);
+    lastSavedTime.current = 0;
+  }, [episode]);
+
+  const handleVideoLoaded = () => {
+    if (promptShownForEp) return; // Ya se le preguntó para este episodio
+    const key = `${id}-${episode}`;
+    const progress = videoProgress[key];
+    if (progress && progress > 5) { // Si vio más de 5 segundos
+      setSavedTime(progress);
+      setShowResumePrompt(true);
+      setPromptShownForEp(true);
+      if (nativeVideoRef.current) {
+         nativeVideoRef.current.pause();
+      }
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (!nativeVideoRef.current) return;
+    const currentTime = nativeVideoRef.current.currentTime;
+    // Guardar progreso cada 5 segundos
+    if (Math.abs(currentTime - lastSavedTime.current) > 5) {
+      lastSavedTime.current = currentTime;
+      const key = `${id}-${episode}`;
+      setVideoProgress(prev => ({
+        ...prev,
+        [key]: currentTime
+      }));
+    }
+  };
+
+  const handleResume = () => {
+    if (nativeVideoRef.current) {
+      nativeVideoRef.current.currentTime = savedTime;
+      nativeVideoRef.current.play();
+    }
+    setShowResumePrompt(false);
+  };
+
+  const handleStartOver = () => {
+    if (nativeVideoRef.current) {
+      nativeVideoRef.current.currentTime = 0;
+      nativeVideoRef.current.play();
+    }
+    setShowResumePrompt(false);
+  };
+
 
   // Auto-scroll al reproductor cuando cambia el episodio y termina de cargar
   useEffect(() => {
@@ -35,14 +92,20 @@ const Watch = () => {
         const container = sidebarListRef.current;
         const activeItem = activeEpisodeRef.current;
         
-        // Centrar el elemento activo en el contenedor de la lista
-        const scrollPos = activeItem.offsetTop - container.offsetTop - (container.clientHeight / 2) + (activeItem.clientHeight / 2);
+        let scrollPos;
+        if (window.innerWidth <= 1024) {
+          // En celular/tablet, alinear el elemento activo hasta arriba
+          scrollPos = activeItem.offsetTop - container.offsetTop;
+        } else {
+          // En PC, centrar el elemento activo en el contenedor
+          scrollPos = activeItem.offsetTop - container.offsetTop - (container.clientHeight / 2) + (activeItem.clientHeight / 2);
+        }
         
         container.scrollTo({
           top: scrollPos,
           behavior: 'smooth'
         });
-      }, 600); // Ligeramente después del scroll principal para evitar conflictos
+      }, 600);
     }
   }, [episode, loading, episodes]);
 
@@ -63,19 +126,32 @@ const Watch = () => {
     fetchWatchData();
   }, [id, episode]);
 
-  // Efecto separado para actualizar el reproductor cuando cambia el idioma o episodio
+  // Efecto separado para actualizar el reproductor cuando cambia el episodio
   useEffect(() => {
     const fetchServers = async () => {
       if (animeInfo) {
-        // Find the current episode object to get its season and correct tmdb episode id
         const currentEp = episodes.find(ep => ep.id.toString() === episode.toString());
         const seasonNumber = currentEp ? currentEp.season : 1;
         const correctEpisodeId = currentEp ? currentEp.tmdb_episode_id : episode;
         
-        const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, language, animeInfo.id, seasonNumber);
+        // Obtenemos todos los servidores (de todos los idiomas) para este episodio
+        const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, 'sub', animeInfo.id, seasonNumber);
         setServers(serversData);
-        if (serversData.length > 0) {
-          setActiveServer(serversData[0]);
+
+        // Intentar seleccionar un idioma disponible preferido (LAT > SUB > CAST)
+        const availableLangs = [...new Set(serversData.map(s => s.lang))];
+        let defaultLang = 'sub';
+        if (availableLangs.includes('latino')) defaultLang = 'latino';
+        else if (availableLangs.includes('sub')) defaultLang = 'sub';
+        else if (availableLangs.length > 0 && availableLangs[0] !== 'none') defaultLang = availableLangs[0];
+
+        setLanguage(defaultLang);
+
+        const langServers = serversData.filter(s => s.lang === defaultLang || s.lang === 'none');
+        if (langServers.length > 0) {
+          setActiveServer(langServers[0]);
+        } else {
+           setActiveServer(serversData[0]); // fallback
         }
 
         // Guardar progreso en Continuar Viendo
@@ -85,25 +161,18 @@ const Watch = () => {
             id: animeInfo.id,
             title: animeInfo.title,
             image: animeInfo.image,
-            episodeNumber: episode, // Guardamos el número del episodio para la tarjeta
-            episodeId: episode // ID real del episodio para el link
+            episodeNumber: episode,
+            episodeId: episode
           };
-          
-          // Eliminar si ya existía para ponerlo al principio (asegurar que comparamos strings)
           const filtered = currentList.filter(item => String(item.id) !== String(animeInfo.id));
-          const newList = [animeData, ...filtered];
-          
-          // Mantener máximo 20 elementos para no llenar el local storage
-          return newList.slice(0, 20);
+          return [animeData, ...filtered].slice(0, 20);
         });
 
         // Marcar como visto automáticamente
         setWatchedEpisodes(prev => {
           const currentList = prev || [];
           const epStr = `${animeInfo.id}-${episode}`;
-          if (!currentList.includes(epStr)) {
-            return [...currentList, epStr];
-          }
+          if (!currentList.includes(epStr)) return [...currentList, epStr];
           return currentList;
         });
 
@@ -123,7 +192,16 @@ const Watch = () => {
       }
     };
     fetchServers();
-  }, [language, animeInfo, episode, episodes]);
+  }, [animeInfo, episode, episodes]); // quitamos 'language' de dependencias porque ya no fetchea de nuevo
+
+  // Handler para cuando el usuario cambia de idioma manualmente
+  const handleLanguageChange = (newLang) => {
+      setLanguage(newLang);
+      const langServers = servers.filter(s => s.lang === newLang || s.lang === 'none');
+      if (langServers.length > 0) {
+          setActiveServer(langServers[0]);
+      }
+  };
 
   if (loading) return <div className={styles.loading}>Cargando episodio...</div>;
 
@@ -132,6 +210,10 @@ const Watch = () => {
   const prevEpisode = currentEpIndex > 0 ? episodes[currentEpIndex - 1] : null;
   const nextEpisode = currentEpIndex >= 0 && currentEpIndex < episodes.length - 1 ? episodes[currentEpIndex + 1] : null;
   const currentEpTitle = currentEpIndex >= 0 ? episodes[currentEpIndex].title : `Episodio ${episode}`;
+
+  // Filtrar servidores a mostrar según el idioma seleccionado
+  const visibleServers = servers.filter(s => s.lang === language || s.lang === 'none');
+  const availableLanguages = [...new Set(servers.map(s => s.lang).filter(l => l !== 'none'))];
 
   return (
     <div className={styles.watchContainer}>
@@ -144,10 +226,43 @@ const Watch = () => {
       </div>
 
       <div className={styles.playerControls} ref={playerRef}>
+        
+        {availableLanguages.length > 0 && (
+            <div className={styles.languageSelector}>
+              <span className={styles.langLabel}>Idioma:</span>
+              <div className={styles.langButtons}>
+                {availableLanguages.includes('latino') && (
+                    <button 
+                      className={`${styles.langBtn} ${language === 'latino' ? styles.langActive : ''}`} 
+                      onClick={() => handleLanguageChange('latino')}
+                    >
+                      Español Latino
+                    </button>
+                )}
+                {availableLanguages.includes('sub') && (
+                    <button 
+                      className={`${styles.langBtn} ${language === 'sub' ? styles.langActive : ''}`} 
+                      onClick={() => handleLanguageChange('sub')}
+                    >
+                      Subtitulado
+                    </button>
+                )}
+                {availableLanguages.includes('castellano') && (
+                    <button 
+                      className={`${styles.langBtn} ${language === 'castellano' ? styles.langActive : ''}`} 
+                      onClick={() => handleLanguageChange('castellano')}
+                    >
+                      Castellano
+                    </button>
+                )}
+              </div>
+            </div>
+        )}
+
         <div className={styles.serverSelector}>
           <span className={styles.langLabel}>Servidor:</span>
           <div className={styles.serverButtons}>
-            {servers.map((server, idx) => (
+            {visibleServers.map((server, idx) => (
               <button 
                 key={idx} 
                 className={`${styles.serverBtn} ${activeServer?.name === server.name ? styles.serverActive : ''}`} 
@@ -167,12 +282,39 @@ const Watch = () => {
             <div className={styles.playerContainer}>
               <div className={styles.videoWrapper}>
                 {activeServer ? (
-                  <iframe 
-                    src={activeServer.url} 
-                    allowFullScreen 
-                    className={styles.iframe}
-                    title="Reproductor"
-                  ></iframe>
+                  activeServer.url.includes('.mp4') ? (
+                    <>
+                      <video 
+                        ref={nativeVideoRef}
+                        src={activeServer.url} 
+                        controls 
+                        autoPlay 
+                        className={styles.iframe}
+                        onLoadedMetadata={handleVideoLoaded}
+                        onTimeUpdate={handleTimeUpdate}
+                      ></video>
+                      
+                      {showResumePrompt && (
+                        <div className={styles.resumeOverlay}>
+                          <div className={styles.resumeBox}>
+                            <h3>Continuar Viendo</h3>
+                            <p>Te quedaste en el minuto {Math.floor(savedTime / 60)}:{(Math.floor(savedTime % 60)).toString().padStart(2, '0')}</p>
+                            <div className={styles.resumeActions}>
+                              <button onClick={handleResume} className={styles.resumeBtn}>Continuar</button>
+                              <button onClick={handleStartOver} className={styles.startOverBtn}>Empezar de cero</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <iframe 
+                      src={activeServer.url} 
+                      allowFullScreen 
+                      className={styles.iframe}
+                      title="Reproductor"
+                    ></iframe>
+                  )
                 ) : (
                   <div className={styles.loadingServer}>Cargando servidor...</div>
                 )}
@@ -224,12 +366,12 @@ const Watch = () => {
               onClick={() => navigate(`/watch/${id}/${prevEpisode?.id}`)}
             >
               <ChevronLeft size={20} />
-              Episodio Anterior
+              <span className={styles.desktopText}>Episodio Anterior</span>
             </button>
 
             <Link to={`/anime/${id}`} className={styles.controlBtn}>
               <List size={20} />
-              Lista de Episodios
+              <span className={styles.desktopText}>Lista de Episodios</span>
             </Link>
 
             <button 
@@ -237,7 +379,7 @@ const Watch = () => {
               disabled={!nextEpisode}
               onClick={() => navigate(`/watch/${id}/${nextEpisode?.id}`)}
             >
-              Siguiente Episodio
+              <span className={styles.desktopText}>Siguiente Episodio</span>
               <ChevronRight size={20} />
             </button>
           </div>

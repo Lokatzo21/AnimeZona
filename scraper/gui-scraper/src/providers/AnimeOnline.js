@@ -10,10 +10,17 @@ class AnimeOnlineProvider extends BaseProvider {
     let currentEpisodeNumber = startEpisode;
     let targetPage = await this.browser.newPage();
 
-    this.log('Verificando episodios existentes en la BD...');
-    const { rows } = await this.client.query(`SELECT episode_number FROM anime_episodes WHERE search_title = $1`, [title.toLowerCase()]);
-    const existingEpisodes = new Set(rows.map(r => r.episode_number));
-    this.log(`Se encontraron ${existingEpisodes.size} episodios guardados previamente.`, 'success');
+    this.log('Verificando episodios e idiomas existentes en la BD...');
+    const { rows } = await this.client.query(`SELECT episode_number, language FROM anime_episodes WHERE search_title = $1`, [title.toLowerCase()]);
+    
+    // Agrupar idiomas existentes por episodio
+    const episodeLangs = {};
+    for (const r of rows) {
+       if (!episodeLangs[r.episode_number]) episodeLangs[r.episode_number] = new Set();
+       episodeLangs[r.episode_number].add(r.language);
+    }
+    
+    this.log(`Se encontraron registros para ${Object.keys(episodeLangs).length} episodios previamente.`, 'success');
 
     this.log('Navegando a la página principal del anime...');
     try {
@@ -111,8 +118,12 @@ class AnimeOnlineProvider extends BaseProvider {
     for (let i = 0; i < episodeLinks.length; i++) {
         const epUrl = episodeLinks[i];
         
-        if (existingEpisodes.has(currentEpisodeNumber)) {
-            this.log(`Saltando Episodio ${currentEpisodeNumber} (Ya existe en la BD).`, 'warning');
+        const existingLangs = episodeLangs[currentEpisodeNumber] || new Set();
+        
+        // Si el episodio ya tiene guardada la versión en LATINO, nos lo saltamos para ahorrar tiempo.
+        // Si solo tiene SUBTITULADO u otro, entramos a buscar por si ya subieron la versión en LATINO.
+        if (existingLangs.has('latino')) {
+            this.log(`Saltando Episodio ${currentEpisodeNumber} (Ya existe versión en LATINO en la BD).`, 'warning');
             currentEpisodeNumber++;
             continue;
         }
@@ -161,147 +172,183 @@ class AnimeOnlineProvider extends BaseProvider {
         }
         if (!playerFrame) playerFrame = targetPage.mainFrame(); 
 
-        const languageResult = await playerFrame.evaluate(() => {
+        const languagesToExtract = await playerFrame.evaluate(() => {
           const lis = Array.from(document.querySelectorAll('li'));
-          const latLi = lis.find(li => {
-             const onclickStr = li.getAttribute('onclick') || '';
-             const textStr = li.textContent.toUpperCase();
-             const htmlStr = li.innerHTML.toUpperCase();
-             return onclickStr.includes('LAT') || textStr.includes('LATINO') || textStr.includes(' LAT ') || htmlStr.includes('LAT.PNG');
-          });
+          const langs = [];
           
-          if (latLi) {
-            latLi.click();
-            try { const fn = new Function(latLi.getAttribute('onclick')); fn.call(latLi); } catch(e) {}
-            return { found: true, lang: 'LAT' };
-          }
+          const latLi = lis.find(li => {
+             const o = li.getAttribute('onclick') || '';
+             const t = li.textContent.toUpperCase();
+             const h = li.innerHTML.toUpperCase();
+             return o.includes('LAT') || t.includes('LATINO') || t.includes(' LAT ') || h.includes('LAT.PNG');
+          });
+          if (latLi) langs.push({ lang: 'latino', elIndex: lis.indexOf(latLi) });
           
           const subLi = lis.find(li => {
-             const onclickStr = li.getAttribute('onclick') || '';
-             const textStr = li.textContent.toUpperCase();
-             const htmlStr = li.innerHTML.toUpperCase();
-             return onclickStr.includes('SUB') || textStr.includes('SUBTITULADO') || textStr.includes(' SUB ') || htmlStr.includes('SUB.PNG');
+             const o = li.getAttribute('onclick') || '';
+             const t = li.textContent.toUpperCase();
+             const h = li.innerHTML.toUpperCase();
+             return o.includes('SUB') || t.includes('SUBTITULADO') || t.includes(' SUB ') || h.includes('SUB.PNG');
           });
+          if (subLi) langs.push({ lang: 'sub', elIndex: lis.indexOf(subLi) });
           
-          if (subLi) {
-            subLi.click();
-            try { const fn = new Function(subLi.getAttribute('onclick')); fn.call(subLi); } catch(e) {}
-            return { found: true, lang: 'SUB' };
+          const castLi = lis.find(li => {
+             const o = li.getAttribute('onclick') || '';
+             const t = li.textContent.toUpperCase();
+             const h = li.innerHTML.toUpperCase();
+             return o.includes('CAST') || t.includes('CASTELLANO') || h.includes('CAST.PNG');
+          });
+          if (castLi) langs.push({ lang: 'castellano', elIndex: lis.indexOf(castLi) });
+          
+          if (langs.length === 0) {
+              // Si no hay botones de idioma, asumimos que estamos en una pestaña y extraemos en 'sub' (o lo que venga por defecto)
+              langs.push({ lang: 'sub', elIndex: -1 });
           }
-          return { found: false, lang: 'UNKNOWN' };
+          
+          return langs;
         });
 
-        let serverName = "Supabase Demo (Latino)";
-        if (languageResult.lang === 'SUB') {
-           serverName = "Supabase Demo (Subtitulado)";
-           this.log(`Idioma Latino no disponible. Usando Subtitulado.`, 'warning');
-        }
+        this.log(`Idiomas detectados: ${languagesToExtract.map(l => l.lang.toUpperCase()).join(', ')}`, 'info');
 
-        await this.delay(4000);
+        // Borramos primero todos los registros de este episodio para insertar los nuevos sin duplicar
+        await this.client.query(`DELETE FROM anime_episodes WHERE search_title = $1 AND episode_number = $2`, [title.toLowerCase(), currentEpisodeNumber]);
 
-        const serverSelected = await playerFrame.evaluate(() => {
-          const lis = Array.from(document.querySelectorAll('li'));
-          
-          // Orden de prioridad (mejores primero)
-          const priorities = ['FILEMOON', 'EARNVIDS', 'FILELIONS', 'UQLOAD', 'STREAMTAPE'];
-          
-          for (const serverName of priorities) {
-            const btn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes(serverName) && li.offsetWidth > 0 && li.offsetHeight > 0);
-            if (btn) {
-              btn.click();
-              return serverName;
-            }
-          }
-          
-          // Fallback: el primero visible que diga HD
-          const hdBtn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes('HD') && li.offsetWidth > 0 && li.offsetHeight > 0);
-          if (hdBtn) {
-            hdBtn.click();
-            return 'HD_FALLBACK';
-          }
-          
-          // Fallback final: cualquier botón visible
-          const anyVisibleBtn = lis.find(li => li.offsetWidth > 0 && li.offsetHeight > 0);
-          if (anyVisibleBtn) {
-            anyVisibleBtn.click();
-            return 'ANY_FALLBACK';
-          }
-          
-          return null;
-        });
-        
-        if (serverSelected) {
-          this.log(`Servidor de video seleccionado: ${serverSelected}`, 'info');
-        } else {
-          this.log(`No se encontró ningún botón de servidor de video.`, 'warning');
-        }
-        
-        this.log('Esperando a que cargue el reproductor (si ves un botón de verificar, hazle clic)...', 'info');
+        let successCount = 0;
 
-        let videoUrl = null;
-        const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape'];
-
-        for (let attempt = 0; attempt < 30; attempt++) {
-            // Intentar auto-clickear el botón de humano si existe en playerFrame
-            if (playerFrame) {
-                try {
-                    await playerFrame.evaluate(() => {
-                        const botHumano = document.querySelector('.BotHumano');
-                        if (botHumano && botHumano.offsetHeight > 0) {
-                            botHumano.click();
-                        } else {
-                            // Buscar por texto
-                            const divs = Array.from(document.querySelectorAll('div'));
-                            const clickDiv = divs.find(d => d.innerText && d.innerText.includes('Haz clic en el botón de reproducción'));
-                            if (clickDiv) clickDiv.click();
-                        }
-                    });
-                } catch(e) {}
+        for (const langObj of languagesToExtract) {
+            this.log(`\n=== Procesando Idioma: ${langObj.lang.toUpperCase()} ===`, 'info');
+            
+            if (langObj.elIndex !== -1) {
+                // Hacemos click en el idioma
+                await playerFrame.evaluate((idx) => {
+                    const li = document.querySelectorAll('li')[idx];
+                    if (li) {
+                        li.click();
+                        try { const fn = new Function(li.getAttribute('onclick')); fn.call(li); } catch(e) {}
+                    }
+                }, langObj.elIndex);
+                await this.delay(3000); // Esperar a que carguen los botones de los servidores
             }
 
-            // 1. Buscar en todos los frames cargados en Puppeteer
-            for (const frame of targetPage.frames()) {
-               const fUrl = frame.url().toLowerCase();
-               if (knownHosts.some(host => fUrl.includes(host))) {
-                  videoUrl = frame.url();
-                  break;
-               }
-            }
-            if (videoUrl) break;
+            // Detectar servidores disponibles para este idioma
+            const availableServers = await playerFrame.evaluate(() => {
+                const lis = Array.from(document.querySelectorAll('li'));
+                // Servidores recomendados por el usuario
+                const priorities = ['ZOPLAYER', 'EARNVIDS', 'STREAMWISH', 'SAVEFILES', 'FILEMOON', 'VIDARA', 'FILELIONS', 'UQLOAD', 'STREAMTAPE'];
+                const found = [];
+                
+                for (const serverName of priorities) {
+                    const btn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes(serverName) && li.offsetWidth > 0 && li.offsetHeight > 0);
+                    if (btn) {
+                        found.push({ name: serverName, index: lis.indexOf(btn) });
+                    }
+                }
+                
+                // Fallbacks si no se encontró nada de los recomendados
+                if (found.length === 0) {
+                    const hdBtn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes('HD') && li.offsetWidth > 0 && li.offsetHeight > 0);
+                    if (hdBtn) found.push({ name: 'HD_FALLBACK', index: lis.indexOf(hdBtn) });
+                    
+                    if (found.length === 0) {
+                        const anyBtn = lis.find(li => li.offsetWidth > 0 && li.offsetHeight > 0 && !li.innerHTML.toUpperCase().includes('PNG') && !li.textContent.toUpperCase().includes('LAT') && !li.textContent.toUpperCase().includes('SUB'));
+                        if (anyBtn) found.push({ name: 'ANY_FALLBACK', index: lis.indexOf(anyBtn) });
+                    }
+                }
+                
+                return found;
+            });
 
-            // 2. Buscar inyecciones directas en el DOM del playerFrame (como iframe#IFR)
-            if (playerFrame && !videoUrl) {
-                try {
-                    videoUrl = await playerFrame.evaluate((hosts) => {
-                        const ifr = document.querySelector('iframe#IFR');
-                        if (ifr && ifr.src && hosts.some(h => ifr.src.toLowerCase().includes(h))) {
-                            return ifr.src;
-                        }
-                        
-                        const iframes = Array.from(document.querySelectorAll('iframe'));
-                        for (const f of iframes) {
-                            if (f.src) {
-                                const srcLower = f.src.toLowerCase();
-                                if (hosts.some(host => srcLower.includes(host))) {
-                                    return f.src;
+            if (availableServers.length === 0) {
+                this.log(`No se encontraron servidores de video para ${langObj.lang}.`, 'warning');
+                continue;
+            }
+
+            this.log(`Servidores encontrados para ${langObj.lang}: ${availableServers.map(s => s.name).join(', ')}`, 'info');
+
+            for (const server of availableServers) {
+                this.log(`-> Extrayendo servidor: ${server.name}`, 'info');
+
+                // Click en el servidor
+                await playerFrame.evaluate((idx) => {
+                    const li = document.querySelectorAll('li')[idx];
+                    if (li) li.click();
+                }, server.index);
+
+                this.log('Esperando a que cargue el reproductor (resolviendo captchas automatizados si existen)...');
+                await this.delay(3000); // Dar tiempo al iframe interno a que se genere
+
+                let videoUrl = null;
+                const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara'];
+
+                for (let attempt = 0; attempt < 20; attempt++) { // Reducimos intentos por servidor de 30 a 20 para no tardar una eternidad
+                    if (playerFrame) {
+                        try {
+                            await playerFrame.evaluate(() => {
+                                const botHumano = document.querySelector('.BotHumano');
+                                if (botHumano && botHumano.offsetHeight > 0) botHumano.click();
+                                else {
+                                    const divs = Array.from(document.querySelectorAll('div'));
+                                    const clickDiv = divs.find(d => d.innerText && d.innerText.includes('Haz clic en el botón de reproducción'));
+                                    if (clickDiv) clickDiv.click();
                                 }
-                            }
-                        }
-                        return null;
-                    }, knownHosts);
-                } catch(e) {}
-            }
-            if (videoUrl) break;
+                            });
+                        } catch(e) {}
+                    }
 
-            await this.delay(2000); // Esperar 2 segundos antes de volver a checar
+                    // 1. Buscar en todos los frames cargados en Puppeteer
+                    for (const frame of targetPage.frames()) {
+                       const fUrl = frame.url().toLowerCase();
+                       if (knownHosts.some(host => fUrl.includes(host))) {
+                          videoUrl = frame.url();
+                          break;
+                       }
+                    }
+                    if (videoUrl) break;
+
+                    // 2. Buscar inyecciones directas en el DOM del playerFrame
+                    if (playerFrame && !videoUrl) {
+                        try {
+                            videoUrl = await playerFrame.evaluate((hosts) => {
+                                const ifr = document.querySelector('iframe#IFR');
+                                if (ifr && ifr.src && hosts.some(h => ifr.src.toLowerCase().includes(h))) {
+                                    return ifr.src;
+                                }
+                                
+                                const iframes = Array.from(document.querySelectorAll('iframe'));
+                                for (const f of iframes) {
+                                    if (f.src) {
+                                        const srcLower = f.src.toLowerCase();
+                                        if (hosts.some(host => srcLower.includes(host))) {
+                                            return f.src;
+                                        }
+                                    }
+                                }
+                                return null;
+                            }, knownHosts);
+                        } catch(e) {}
+                    }
+                    if (videoUrl) break;
+
+                    await this.delay(2000);
+                }
+
+                if (!videoUrl) {
+                    this.log(`No se pudo extraer URL para ${server.name} (${langObj.lang}).`, 'warning');
+                } else {
+                    await this.client.query(
+                        `INSERT INTO anime_episodes (search_title, episode_number, server_name, video_url, language) VALUES ($1, $2, $3, $4, $5)`,
+                        [title.toLowerCase(), currentEpisodeNumber, server.name, videoUrl, langObj.lang]
+                    );
+                    this.log(`[EXITO] Guardado ${server.name} (${langObj.lang})`, 'success');
+                    successCount++;
+                }
+            }
         }
 
-        if (!videoUrl) {
-           this.log(`No se pudo extraer la URL del video para el episodio ${currentEpisodeNumber}.`, 'error');
+        if (successCount > 0) {
+            this.log(`✅ Episodio ${currentEpisodeNumber} completado (${successCount} servidores guardados).`, 'success');
         } else {
-           await this.client.query(`DELETE FROM anime_episodes WHERE search_title = $1 AND episode_number = $2`, [title.toLowerCase(), currentEpisodeNumber]);
-           await this.client.query(`INSERT INTO anime_episodes (search_title, episode_number, server_name, video_url) VALUES ($1, $2, $3, $4)`, [title.toLowerCase(), currentEpisodeNumber, serverName, videoUrl]);
-           this.log(`Episodio ${currentEpisodeNumber} guardado correctamente! (${languageResult.lang} | ${serverSelected})`, 'success');
+            this.log(`❌ No se pudo guardar ningún servidor para el episodio ${currentEpisodeNumber}.`, 'error');
         }
 
         currentEpisodeNumber++;

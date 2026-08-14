@@ -283,11 +283,39 @@
   .navLinks.mobileOpen {
     display: flex;
   }
-
-  .searchInput { display: none; }
   
   .mobileMenu { display: block; }
   
   .userMenu { gap: 0.5rem; }
   .logoutBtn { padding: 4px 8px; font-size: 0.8rem; }
+  
+  /* Make search input look good on mobile */
+  .searchContainer {
+    width: 100%;
+  }
+  
+  .searchInput {
+    width: 100%;
+    /* Keep it displayed! Don't hide it. */
+  }
+  
+  /* The navActions holds search and auth. On mobile, we might need to adjust it */
+  .navActions {
+    display: flex;
+  }
+
+  .desktopSearchOnly {
+    display: none !important;
+  }
+
+  .mobileSearchOnly {
+    display: flex !important;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+}
+
+.mobileSearchOnly {
+  display: none;
 }

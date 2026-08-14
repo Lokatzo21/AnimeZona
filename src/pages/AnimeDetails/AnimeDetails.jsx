@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Play, Eye, Heart, Check } from 'lucide-react';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useUI } from '../../contexts/UIContext';
 import styles from './AnimeDetails.module.css';
 
 const AnimeDetails = () => {
@@ -11,10 +12,15 @@ const AnimeDetails = () => {
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const navigate = useNavigate();
+  const { showToast, showConfirm } = useUI();
+  
+  const pressTimer = useRef(null);
+  const isLongPress = useRef(false);
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -51,9 +57,40 @@ const AnimeDetails = () => {
 
   const isFavorite = favoriteAnimes.some(a => a.id === animeInfo.id);
 
-  const handleToggleFavorite = () => {
+  const startPress = (e) => {
+    if (e.button && e.button !== 0) return; // Ignore right clicks
+    isLongPress.current = false;
+    const duration = isFavorite ? 5000 : 3000;
+    
+    pressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      const isSecret = secretLikes.some(a => a.id === animeInfo.id);
+      if (!isSecret) {
+        setSecretLikes(prev => [{ id: animeInfo.id, title: animeInfo.title, image: animeInfo.image }, ...prev]);
+        showToast("Listo :)");
+      } else {
+        showToast("Ya está en tus secretos");
+      }
+    }, duration);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  const handleToggleFavorite = (e) => {
+    if (isLongPress.current) {
+      isLongPress.current = false;
+      return;
+    }
+
     if (isFavorite) {
-      setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== animeInfo.id));
+      showConfirm("¿Estás seguro que deseas quitar este anime de tus favoritos?", () => {
+        setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== animeInfo.id));
+      });
     } else {
       setFavoriteAnimes([{
         id: animeInfo.id,
@@ -98,7 +135,12 @@ const AnimeDetails = () => {
             <span className={styles.status}>{animeInfo.status}</span>
             <button 
               className={`${styles.favoriteToggle} ${isFavorite ? styles.isFavorite : ''}`}
+              onPointerDown={startPress}
+              onPointerUp={cancelPress}
+              onPointerLeave={cancelPress}
+              onPointerCancel={cancelPress}
               onClick={handleToggleFavorite}
+              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
               title="Añadir a favoritos"
             >
               <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />

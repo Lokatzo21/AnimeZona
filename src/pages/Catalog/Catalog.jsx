@@ -9,6 +9,8 @@ const ALL_GENRES = [
   'Animación', 'Action & Adventure', 'Sci-Fi & Fantasy', 'Comedia', 'Drama', 'Misterio'
 ];
 
+let catalogCache = {};
+
 const Catalog = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedGenre = searchParams.get('genre') || 'Todos';
@@ -17,22 +19,64 @@ const Catalog = () => {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(false);
   
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   
   const loaderRef = useRef(null);
 
-  // Reiniciar estado cuando cambia el género
+  // Reiniciar estado o cargar de caché cuando cambia el género
   useEffect(() => {
-    setCatalog([]);
-    setPage(1);
-    setHasMore(true);
-    // El fetch real se hará por el efecto de `page` a continuación
+    const cached = catalogCache[selectedGenre];
+    if (cached) {
+      setCatalog(cached.catalog);
+      setPage(cached.page);
+      setHasMore(cached.hasMore);
+      setIsRestoring(true);
+      
+      // Restaurar scroll position de manera segura después del render
+      setTimeout(() => {
+        window.scrollTo(0, cached.scrollY);
+      }, 50);
+    } else {
+      setCatalog([]);
+      setPage(1);
+      setHasMore(true);
+      setIsRestoring(false);
+    }
+  }, [selectedGenre]);
+
+  // Actualizar caché cuando los datos cambian
+  useEffect(() => {
+    if (catalog.length > 0) {
+      catalogCache[selectedGenre] = {
+        catalog,
+        page,
+        hasMore,
+        scrollY: catalogCache[selectedGenre]?.scrollY || window.scrollY
+      };
+    }
+  }, [catalog, page, hasMore, selectedGenre]);
+
+  // Guardar scroll position en el caché en tiempo real
+  useEffect(() => {
+    const handleScroll = () => {
+      if (catalogCache[selectedGenre]) {
+        catalogCache[selectedGenre].scrollY = window.scrollY;
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [selectedGenre]);
 
   // Fetch de datos
   useEffect(() => {
+    if (isRestoring) {
+      setIsRestoring(false);
+      return;
+    }
+
     const fetchCatalog = async () => {
       setLoading(true);
       const data = await api.getDiscoverAnime(page, selectedGenre);
@@ -41,7 +85,6 @@ const Catalog = () => {
         setHasMore(false);
       } else {
         setCatalog(prev => {
-          // Filtrar duplicados por si acaso
           const newItems = data.filter(item => !prev.some(p => p.id === item.id));
           return [...prev, ...newItems];
         });
@@ -52,7 +95,7 @@ const Catalog = () => {
     if (hasMore) {
       fetchCatalog();
     }
-  }, [page, selectedGenre, hasMore]);
+  }, [page, selectedGenre, hasMore]); // isRestoring not in deps because we only use it to block
 
   // Intersection Observer para Infinite Scroll
   const handleObserver = useCallback((entries) => {

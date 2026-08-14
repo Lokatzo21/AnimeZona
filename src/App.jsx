@@ -8,7 +8,9 @@ import Catalog from './pages/Catalog/Catalog';
 import './App.css';
 
 import { AuthProvider } from './contexts/AuthContext';
+import { UIProvider } from './contexts/UIContext';
 import Login from './pages/Login/Login';
+import SecretZone from './pages/SecretZone/SecretZone';
 
 function App() {
   const location = useLocation();
@@ -16,17 +18,20 @@ function App() {
 
   return (
     <AuthProvider>
-      <Navbar />
-      <main className={`${isWatchPage ? 'watch-page-container' : 'container'} animate-fade-in`}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/anime/:id" element={<AnimeDetails />} />
-          <Route path="/watch/:id/:episode" element={<Watch />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/catalog" element={<Catalog />} />
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </main>
+      <UIProvider>
+        <Navbar />
+        <main className={`${isWatchPage ? 'watch-page-container' : 'container'} animate-fade-in`}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/anime/:id" element={<AnimeDetails />} />
+            <Route path="/watch/:id/:episode" element={<Watch />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/secret" element={<SecretZone />} />
+          </Routes>
+        </main>
+      </UIProvider>
     </AuthProvider>
   );
 }

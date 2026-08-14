@@ -1,10 +1,19 @@
 .card {
-  width: 200px;
+  width: 100%; 
+  max-width: 140px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   transition: var(--transition-normal);
+}
+
+/* For Carousel and Desktop Grid */
+@media (min-width: 768px) {
+  .card {
+    width: 200px;
+    max-width: none;
+  }
 }
 
 .card:hover {
@@ -152,6 +161,9 @@
   padding: 4px;
   border-radius: 50%;
   transition: var(--transition-fast);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 .favoriteBtn:hover {
@@ -299,4 +311,54 @@
 .tagBtn:hover {
   background: rgba(168, 85, 247, 1);
   transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+  .confirmHideContainer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    background: var(--bg-dark-secondary);
+    border: none;
+    border-top: 1px solid var(--glass-border);
+    border-radius: 20px 20px 0 0;
+    padding: 2rem 1.5rem;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+    z-index: 10000;
+    gap: 1.5rem;
+    animation: slideUpSheet 0.3s ease-out forwards;
+  }
+
+  .confirmText {
+    font-size: 1.25rem;
+    color: var(--text-primary);
+    text-align: center;
+  }
+
+  .confirmButtons {
+    width: 100%;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 1rem;
+  }
+
+  .confirmBtn, .cancelBtn {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    border-radius: var(--border-radius-md);
+  }
+
+  .cancelBtn {
+    background: transparent;
+    border: 1px solid var(--text-muted);
+  }
+
+  @keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
 }

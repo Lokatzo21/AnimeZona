@@ -224,15 +224,10 @@ export const api = {
     }
   },
 
-  // Reproductor - Ahora usando IDs de TMDB para iFrames funcionales reales
+  // Reproductor - Ahora extrae múltiples servidores e idiomas
   getEpisodeServers: async (animeTitle, episodeId, language = 'sub', animeId = null, seasonNumber = 1) => {
     
-    // Configuraciones de idioma (algunos reproductores multi-idioma cambian basados en la fuente)
-    let langName = 'Subtitulado';
-    if (language === 'latino') langName = 'Latino';
-    if (language === 'castellano') langName = 'Castellano';
-
-    // Asegurarnos de tener el animeId de TMDB (si no lo pasan, usamos YouTube fallback, pero deberíamos pasarlo desde Watch.jsx)
+    // Asegurarnos de tener el animeId de TMDB
     if (!animeId) {
        const searchUrl = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(animeTitle)}`;
        try {
@@ -243,32 +238,40 @@ export const api = {
 
     if (animeId) {
       let servers = [];
-      // Intentar obtener el servidor desde Supabase
       try {
+        // Extraer todos los servidores disponibles para este episodio (sin .limit(1))
         const { data, error } = await supabase
           .from('anime_episodes')
           .select('*')
           .ilike('search_title', animeTitle)
           .eq('episode_number', episodeId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
+          .order('created_at', { ascending: false });
         if (data && data.length > 0) {
-          const lat = data[0];
-          servers.unshift({
-            name: 'Principal',
-            description: `Servidor Oficial (${lat.server_name})`,
+          servers = data.map(lat => ({
+            name: lat.server_name,
+            description: `Servidor Oficial (${lat.language.toUpperCase()})`,
             url: lat.video_url,
-            color: '#f59e0b',
-            icon: 'P'
-          });
+            color: lat.server_name.includes('FILEMOON') ? '#3b82f6' : 
+                   lat.server_name.includes('EARNVIDS') ? '#10b981' : 
+                   lat.server_name.includes('STREAMWISH') ? '#8b5cf6' : 
+                   lat.server_name.includes('ZOPLAYER') ? '#f59e0b' : '#64748b',
+            icon: 'S',
+            lang: lat.language
+          }));
+          
+          // Eliminar duplicados exactos de URL por si acaso
+          servers = servers.filter((server, index, self) =>
+            index === self.findIndex((t) => t.url === server.url)
+          );
+
         } else {
           servers.push({
             name: 'No Disponible',
             description: 'Este episodio aún no se ha agregado al catálogo.',
             url: '',
             color: '#4b5563',
-            icon: 'X'
+            icon: 'X',
+            lang: 'none'
           });
         }
       } catch (e) {
@@ -278,13 +281,14 @@ export const api = {
       return servers;
     } else {
        // Fallback a YouTube si falla la obtención del TMDB ID
-       const query = encodeURIComponent(`${animeTitle} episodio ${episodeId} ${langName}`);
+       const query = encodeURIComponent(`${animeTitle} episodio ${episodeId} ${language}`);
        return [{
          name: 'YOUTUBE FALLBACK',
          description: 'Búsqueda en YouTube',
          url: `https://www.youtube.com/embed?listType=search&list=${query}`,
          color: '#ff0000',
-         icon: 'Y'
+         icon: 'Y',
+         lang: language
        }];
     }
   }

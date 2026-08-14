@@ -14,10 +14,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Verificar sesión actual al cargar
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
       if (session?.user) {
-        syncDown(session.user.id);
+        // Fetch fresh user data to get the latest avatar_url
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          setUser(user ?? session.user);
+          syncDown(session.user.id);
+        });
       } else {
+        setUser(null);
         setLoading(false);
       }
     });

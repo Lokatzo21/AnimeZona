@@ -71,6 +71,35 @@
   background: rgba(0, 0, 0, 0.4);
 }
 
+.passwordContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordContainer input {
+  width: 100%;
+  padding-right: 40px; /* Space for the icon */
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #a0a0a0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.eyeBtn:hover {
+  color: #fff;
+}
+
 .submitBtn {
   background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   color: white;
