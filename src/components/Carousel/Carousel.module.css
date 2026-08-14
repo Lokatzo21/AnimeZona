@@ -1,5 +1,8 @@
 .carouselSection {
   margin-bottom: 3rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden; /* Evitar que el contenedor crezca más allá de la pantalla */
 }
 
 .title {
@@ -13,6 +16,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .scrollArea {
@@ -21,6 +25,8 @@
   overflow-x: auto;
   scroll-behavior: smooth;
   padding: 1rem 0.5rem;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
   /* Hide scrollbar */
   -ms-overflow-style: none;
   scrollbar-width: none;
