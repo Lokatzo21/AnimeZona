@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 
-// Guardar los timers de debounce a nivel de módulo
 const syncTimers = {};
 
+function validateValue(value, initialValue) {
+  if (value === null || value === undefined) return initialValue;
+  if (Array.isArray(initialValue) && !Array.isArray(value)) {
+    return initialValue; // Corrupted array data (e.g. object {} or string)
+  }
+  return value;
+}
+
 export function useLocalStorage(key, initialValue) {
-  // Estado para guardar nuestro valor
   const [storedValue, setStoredValue] = useState(() => {
     if (typeof window === "undefined") {
       return initialValue;
@@ -13,7 +19,7 @@ export function useLocalStorage(key, initialValue) {
       const item = window.localStorage.getItem(key);
       if (item) {
         const parsed = JSON.parse(item);
-        return parsed !== null ? parsed : initialValue;
+        return validateValue(parsed, initialValue);
       }
       return initialValue;
     } catch (error) {
@@ -22,22 +28,18 @@ export function useLocalStorage(key, initialValue) {
     }
   });
 
-  // Retorna una versión envuelta de la función setter de useState que ...
-  // ... persiste el nuevo valor en localStorage.
   const setValue = (value) => {
     try {
       setStoredValue(prevStoredValue => {
         const valueToStore = value instanceof Function ? value(prevStoredValue) : value;
-        const finalValue = valueToStore !== null ? valueToStore : initialValue;
+        const finalValue = validateValue(valueToStore, initialValue);
         
         if (typeof window !== "undefined") {
           window.localStorage.setItem(key, JSON.stringify(finalValue));
-          // Emitir evento custom para sincronizar en la misma pestaña
           window.dispatchEvent(new CustomEvent('local-storage-sync', {
             detail: { key, newValue: finalValue }
           }));
 
-          // Sincronizar hacia arriba (Supabase) con DEBOUNCE para evitar rate limits
           if (syncTimers[key]) clearTimeout(syncTimers[key]);
           
           syncTimers[key] = setTimeout(() => {
@@ -54,7 +56,7 @@ export function useLocalStorage(key, initialValue) {
                 }
               });
             });
-          }, 3000); // 3 segundos de debounce
+          }, 3000);
         }
         return finalValue;
       });
@@ -64,13 +66,12 @@ export function useLocalStorage(key, initialValue) {
   };
 
   useEffect(() => {
-    // Escuchar cambios desde otras pestañas
     const handleStorageChange = (e) => {
       if (e.key === key) {
         if (e.newValue) {
           try {
             const parsed = JSON.parse(e.newValue);
-            setStoredValue(parsed !== null ? parsed : initialValue);
+            setStoredValue(validateValue(parsed, initialValue));
           } catch {
             setStoredValue(initialValue);
           }
@@ -80,10 +81,9 @@ export function useLocalStorage(key, initialValue) {
       }
     };
 
-    // Escuchar cambios en la misma pestaña
     const handleCustomSync = (e) => {
       if (e.detail.key === key) {
-        setStoredValue(e.detail.newValue !== null ? e.detail.newValue : initialValue);
+        setStoredValue(validateValue(e.detail.newValue, initialValue));
       }
     };
 
