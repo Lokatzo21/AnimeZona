@@ -79,7 +79,7 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
   return (
     <div className={styles.card} onContextMenu={handleContextMenu} onMouseLeave={handleMouseLeave}>
       <Link to={linkTo} className={styles.imageContainer}>
-        <img src={anime.image} alt={anime.title} className={styles.image} loading="lazy" />
+        <img src={anime.image} alt={anime.title} className={styles.image} loading="lazy" draggable={false} />
         {onRemoveContinue && (
           <button 
             className={styles.removeContinueBtn}

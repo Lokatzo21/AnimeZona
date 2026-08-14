@@ -6,9 +6,6 @@
   flex-direction: column;
   gap: 0.5rem;
   transition: var(--transition-normal);
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
 }
 
 /* For Carousel and Desktop Grid */
@@ -31,9 +28,6 @@
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   display: block;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
 }
 
 .image {
@@ -41,8 +35,6 @@
   height: 100%;
   object-fit: cover;
   transition: transform 0.5s ease;
-  user-select: none;
-  -webkit-user-drag: none;
 }
 
 .card:hover .image {
