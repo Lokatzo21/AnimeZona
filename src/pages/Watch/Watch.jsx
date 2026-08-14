@@ -157,6 +157,16 @@ const Watch = () => {
         
         // Obtenemos todos los servidores (de todos los idiomas) para este episodio
         const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, 'sub', animeInfo.id, seasonNumber);
+
+        // Priorizar servidores ZONAAPS o .mp4 para que aparezcan primero
+        serversData.sort((a, b) => {
+          const isA_mp4 = a.url?.includes('.mp4') || a.name === 'ZONAAPS';
+          const isB_mp4 = b.url?.includes('.mp4') || b.name === 'ZONAAPS';
+          if (isA_mp4 && !isB_mp4) return -1;
+          if (!isA_mp4 && isB_mp4) return 1;
+          return 0;
+        });
+
         setServers(serversData);
 
         // Intentar seleccionar un idioma disponible preferido (LAT > SUB > CAST)
@@ -309,7 +319,6 @@ const Watch = () => {
                         ref={nativeVideoRef}
                         src={activeServer.url} 
                         controls 
-                        autoPlay 
                         className={styles.iframe}
                         onLoadedMetadata={handleVideoLoaded}
                         onTimeUpdate={handleTimeUpdate}

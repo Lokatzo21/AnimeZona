@@ -10,17 +10,18 @@ class AnimeOnlineProvider extends BaseProvider {
     let currentEpisodeNumber = startEpisode;
     let targetPage = await this.browser.newPage();
 
-    this.log('Verificando episodios e idiomas existentes en la BD...');
-    const { rows } = await this.client.query(`SELECT episode_number, language FROM anime_episodes WHERE search_title = $1`, [title.toLowerCase()]);
+    this.log('Verificando episodios, idiomas y servidores existentes en la BD...');
+    const { rows } = await this.client.query(`SELECT episode_number, language, server_name FROM anime_episodes WHERE search_title = $1`, [title.toLowerCase()]);
     
-    // Agrupar idiomas existentes por episodio
-    const episodeLangs = {};
+    // Agrupar servidores existentes por episodio e idioma
+    const existingServers = {};
     for (const r of rows) {
-       if (!episodeLangs[r.episode_number]) episodeLangs[r.episode_number] = new Set();
-       episodeLangs[r.episode_number].add(r.language);
+       const key = `${r.episode_number}_${r.language}`;
+       if (!existingServers[key]) existingServers[key] = new Set();
+       existingServers[key].add(r.server_name.toUpperCase());
     }
     
-    this.log(`Se encontraron registros para ${Object.keys(episodeLangs).length} episodios previamente.`, 'success');
+    this.log(`Se encontraron registros previos en la BD.`, 'success');
 
     this.log('Navegando a la página principal del anime...');
     try {
@@ -118,16 +119,6 @@ class AnimeOnlineProvider extends BaseProvider {
     for (let i = 0; i < episodeLinks.length; i++) {
         const epUrl = episodeLinks[i];
         
-        const existingLangs = episodeLangs[currentEpisodeNumber] || new Set();
-        
-        // Si el episodio ya tiene guardada la versión en LATINO, nos lo saltamos para ahorrar tiempo.
-        // Si solo tiene SUBTITULADO u otro, entramos a buscar por si ya subieron la versión en LATINO.
-        if (existingLangs.has('latino')) {
-            this.log(`Saltando Episodio ${currentEpisodeNumber} (Ya existe versión en LATINO en la BD).`, 'warning');
-            currentEpisodeNumber++;
-            continue;
-        }
-
         this.log(`Procesando Episodio ${currentEpisodeNumber}...`, 'info');
         
         const rndDelay = Math.floor(Math.random() * 2000) + 2000;
@@ -210,15 +201,23 @@ class AnimeOnlineProvider extends BaseProvider {
 
         this.log(`Idiomas detectados: ${languagesToExtract.map(l => l.lang.toUpperCase()).join(', ')}`, 'info');
 
-        // Borramos primero todos los registros de este episodio para insertar los nuevos sin duplicar
-        await this.client.query(`DELETE FROM anime_episodes WHERE search_title = $1 AND episode_number = $2`, [title.toLowerCase(), currentEpisodeNumber]);
+        // Seleccionar ÚNICAMENTE el MEJOR idioma disponible
+        let targetLanguage = languagesToExtract.find(l => l.lang === 'latino');
+        if (!targetLanguage) targetLanguage = languagesToExtract.find(l => l.lang === 'sub');
+        if (!targetLanguage && languagesToExtract.length > 0) targetLanguage = languagesToExtract[0];
+
+        if (!targetLanguage) {
+            this.log('No se encontraron idiomas en este episodio.', 'warning');
+            currentEpisodeNumber++;
+            continue;
+        }
 
         let successCount = 0;
-
-        for (const langObj of languagesToExtract) {
-            this.log(`\n=== Procesando Idioma: ${langObj.lang.toUpperCase()} ===`, 'info');
-            
-            if (langObj.elIndex !== -1) {
+        const langObj = targetLanguage;
+        
+        this.log(`\n=== Procesando ÚNICO Idioma Elegido: ${langObj.lang.toUpperCase()} ===`, 'info');
+        
+        if (langObj.elIndex !== -1) {
                 // Hacemos click en el idioma
                 await playerFrame.evaluate((idx) => {
                     const li = document.querySelectorAll('li')[idx];
@@ -258,14 +257,27 @@ class AnimeOnlineProvider extends BaseProvider {
                 return found;
             });
 
-            if (availableServers.length === 0) {
-                this.log(`No se encontraron servidores de video para ${langObj.lang}.`, 'warning');
+            // Lógica STREAMTAPE: Quitarlo si hay otras opciones en la web
+            let serversToExtract = availableServers;
+            if (availableServers.length > 1) {
+                serversToExtract = serversToExtract.filter(s => s.name.toUpperCase() !== 'STREAMTAPE');
+            }
+
+            // Omitir servidores que ya existen en la BD para este episodio e idioma
+            const dbKey = `${currentEpisodeNumber}_${langObj.lang}`;
+            const alreadySaved = existingServers[dbKey] || new Set();
+            
+            serversToExtract = serversToExtract.filter(s => !alreadySaved.has(s.name.toUpperCase()));
+
+            if (serversToExtract.length === 0) {
+                this.log(`No hay servidores nuevos para extraer en ${langObj.lang} (todos fueron omitidos o ya existen).`, 'warning');
+                currentEpisodeNumber++;
                 continue;
             }
 
-            this.log(`Servidores encontrados para ${langObj.lang}: ${availableServers.map(s => s.name).join(', ')}`, 'info');
+            this.log(`Servidores a extraer para ${langObj.lang}: ${serversToExtract.map(s => s.name).join(', ')}`, 'info');
 
-            for (const server of availableServers) {
+            for (const server of serversToExtract) {
                 this.log(`-> Extrayendo servidor: ${server.name}`, 'info');
 
                 // Click en el servidor
@@ -278,7 +290,7 @@ class AnimeOnlineProvider extends BaseProvider {
                 await this.delay(3000); // Dar tiempo al iframe interno a que se genere
 
                 let videoUrl = null;
-                const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara'];
+                const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara', 'gupload'];
 
                 for (let attempt = 0; attempt < 20; attempt++) { // Reducimos intentos por servidor de 30 a 20 para no tardar una eternidad
                     if (playerFrame) {
@@ -343,8 +355,6 @@ class AnimeOnlineProvider extends BaseProvider {
                     successCount++;
                 }
             }
-        }
-
         if (successCount > 0) {
             this.log(`✅ Episodio ${currentEpisodeNumber} completado (${successCount} servidores guardados).`, 'success');
         } else {
