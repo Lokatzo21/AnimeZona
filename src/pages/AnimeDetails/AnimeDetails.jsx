@@ -11,6 +11,7 @@ const AnimeDetails = () => {
   const [animeInfo, setAnimeInfo] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [secretLikes = [], setSecretLikes] = useLocalStorage('secretLikes', []);
   const [watchedEpisodes = [], setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
@@ -25,14 +26,30 @@ const AnimeDetails = () => {
   useEffect(() => {
     const fetchInfo = async () => {
       setLoading(true);
-      // Fetch secuencial para evitar rate limit de Jikan
-      const info = await api.getAnimeInfo(id);
-      await new Promise(r => setTimeout(r, 400));
-      const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
-      
-      setAnimeInfo(info);
-      setEpisodes(eps);
-      setLoading(false);
+      setError(false);
+      try {
+        // Hard timeout: si tarda más de 15s, terminamos con error
+        const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+        
+        const info = await Promise.race([
+          api.getAnimeInfo(id),
+          timeout(12000)
+        ]).catch(() => null);
+
+        const eps = await Promise.race([
+          api.getAnimeEpisodes(id, info),
+          timeout(15000)
+        ]).catch(() => []);
+        
+        setAnimeInfo(info);
+        setEpisodes(Array.isArray(eps) ? eps : []);
+        if (!info) setError(true);
+      } catch (e) {
+        console.error('fetchInfo failed:', e);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchInfo();
   }, [id]);
@@ -51,8 +68,18 @@ const AnimeDetails = () => {
     return <div className={styles.loading}>Cargando información del anime...</div>;
   }
 
-  if (!animeInfo) {
-    return <div className={styles.loading}>Error al cargar el anime.</div>;
+  if (error || !animeInfo) {
+    return (
+      <div className={styles.loading} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+        <p>No se pudo cargar este anime.</p>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{ padding: '0.5rem 1.5rem', background: '#e11d48', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '1rem' }}
+        >
+          Reintentar
+        </button>
+      </div>
+    );
   }
 
   const isFavorite = (favoriteAnimes || []).some(a => a.id === animeInfo.id);

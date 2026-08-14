@@ -134,31 +134,36 @@ export const api = {
     }
   },
 
-  // Episodios - Extrae los episodios de la temporada 1 (o la temporada principal)
-  getAnimeEpisodes: async (id) => {
+  // Episodios - Extrae los episodios de todas las temporadas
+  getAnimeEpisodes: async (id, preloadedInfo = null) => {
     try {
-      const info = await api.getAnimeInfo(id);
+      const info = preloadedInfo || await api.getAnimeInfo(id);
       if (!info) return [];
       
       const numSeasons = info.number_of_seasons || 1; 
       let allEpisodes = [];
       let absoluteEpCount = 1;
 
+      const seasonTimeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('season-timeout')), ms));
+
       // Iterar por todas las temporadas (excluyendo la 0 que suele ser especiales)
       for (let s = 1; s <= numSeasons; s++) {
         const seasonUrl = `${BASE_URL}/tv/${id}/season/${s}?api_key=${TMDB_API_KEY}&language=es-MX`;
         try {
-          const seasonData = await fetchWithDelay(seasonUrl);
+          const seasonData = await Promise.race([
+            fetchWithDelay(seasonUrl),
+            seasonTimeout(5000) // 5s max por temporada
+          ]);
           if (seasonData.episodes && seasonData.episodes.length > 0) {
             const today = new Date().toISOString().split('T')[0];
             const seasonEps = seasonData.episodes
-              .filter(ep => !ep.air_date || ep.air_date <= today) // Evitar episodios futuros
+              .filter(ep => !ep.air_date || ep.air_date <= today)
               .map(ep => ({
                 id: ep.episode_number,
                 title: `T${s}E${ep.episode_number} - ${ep.name}`,
                 url: ep.episode_number,
                 season: s,
-                absolute_id: absoluteEpCount++ // Para mantener un id único en la UI
+                absolute_id: absoluteEpCount++
               }));
             allEpisodes = [...allEpisodes, ...seasonEps];
           }
@@ -173,7 +178,7 @@ export const api = {
         const { data } = await supabase
           .from('anime_episodes')
           .select('episode_number')
-          .ilike('search_title', info.title) // ilike no distingue mayúsculas/minúsculas
+          .ilike('search_title', info.title)
           .order('episode_number', { ascending: false })
           .limit(1);
           
@@ -210,8 +215,8 @@ export const api = {
       }
       
       // Fallback si no hay detalles de episodios pero sabemos el total
-      const total = info.number_of_episodes || 12;
-      return Array.from({ length: total }, (_, i) => ({
+      const total = info.episodes || 12;
+      return Array.from({ length: Math.min(total, 500) }, (_, i) => ({
         id: i + 1,
         tmdb_episode_id: i + 1,
         title: `Episodio ${i + 1}`,
