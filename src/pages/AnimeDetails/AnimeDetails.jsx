@@ -100,6 +100,14 @@ const AnimeDetails = () => {
     }
   };
 
+  useEffect(() => {
+    if (animeInfo) {
+      document.title = `${animeInfo.title} | Anime`;
+    } else {
+      document.title = 'Detalles | Anime';
+    }
+  }, [animeInfo]);
+
   const handleToggleEpisodeWatched = (e, epId) => {
     e.preventDefault(); // Evitar que navegue al episodio
     e.stopPropagation();
@@ -117,6 +125,34 @@ const AnimeDetails = () => {
       }
     } else {
       setWatchedEpisodes([globalEpId, ...watchedEpisodes]);
+      
+      // Añadir a Continuar Viendo y Animes Vistos
+      const animeData = {
+        id: animeInfo.id,
+        title: animeInfo.title,
+        image: animeInfo.image,
+        episodeNumber: epId,
+        episodeId: epId
+      };
+      
+      setContinueWatching(continueWatching.filter(item => String(item.id) !== String(animeInfo.id))); // Quitar el viejo para ponerlo arriba
+      setContinueWatching(prev => {
+        const filtered = (prev || []).filter(item => String(item.id) !== String(animeInfo.id));
+        return [animeData, ...filtered].slice(0, 20);
+      });
+
+      setWatchedAnimes(prev => {
+        const currentList = prev || [];
+        if (!currentList.some(a => String(a.id) === String(animeInfo.id))) {
+          return [{
+            id: animeInfo.id,
+            title: animeInfo.title,
+            image: animeInfo.image,
+            status: animeInfo.status
+          }, ...currentList];
+        }
+        return currentList;
+      });
     }
   };
 

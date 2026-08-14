@@ -28,6 +28,7 @@ const Catalog = () => {
 
   // Reiniciar estado o cargar de caché cuando cambia el género
   useEffect(() => {
+    document.title = 'Catálogo | Anime';
     const cached = catalogCache[selectedGenre];
     if (cached) {
       setCatalog(cached.catalog);

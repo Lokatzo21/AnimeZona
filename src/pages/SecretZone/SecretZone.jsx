@@ -6,6 +6,10 @@ import styles from './SecretZone.module.css';
 const SecretZone = () => {
   const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
 
+  useEffect(() => {
+    document.title = 'Secreto | Anime';
+  }, []);
+
   // Función para quitar de la lista secreta si se desea
   const handleRemoveSecretLike = (animeId) => {
     setSecretLikes(prev => prev.filter(a => a.id !== animeId));

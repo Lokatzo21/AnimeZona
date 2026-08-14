@@ -33,6 +33,14 @@ const Watch = () => {
     lastSavedTime.current = 0;
   }, [episode]);
 
+  useEffect(() => {
+    if (animeInfo) {
+      document.title = `Viendo: ${animeInfo.title} | Episodio ${episode} | Anime`;
+    } else {
+      document.title = `Episodio ${episode} | Anime`;
+    }
+  }, [animeInfo, episode]);
+
   const handleVideoLoaded = () => {
     if (promptShownForEp) return; // Ya se le preguntó para este episodio
     const key = `${id}-${episode}`;

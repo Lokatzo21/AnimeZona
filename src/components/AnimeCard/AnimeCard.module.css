@@ -6,6 +6,9 @@
   flex-direction: column;
   gap: 0.5rem;
   transition: var(--transition-normal);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* For Carousel and Desktop Grid */
@@ -28,6 +31,9 @@
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .image {

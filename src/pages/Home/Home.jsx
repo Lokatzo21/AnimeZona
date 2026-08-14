@@ -17,6 +17,7 @@ const Home = () => {
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, anime: null, section: null });
 
   useEffect(() => {
+    document.title = 'Inicio | Anime';
     const fetchHomeData = async () => {
       setLoading(true);
       // Ejecutar secuencialmente con un pequeño retraso para evitar el error 429 (Too Many Requests) de Jikan

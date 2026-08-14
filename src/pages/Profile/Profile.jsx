@@ -15,6 +15,16 @@ const Profile = () => {
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const [activeTab, setActiveTab] = useState('historial');
 
+  useEffect(() => {
+    const titles = {
+      historial: 'Perfil | Historial',
+      favoritos: 'Perfil | Favoritos',
+      ocultos: 'Perfil | Animes Ocultos',
+      cuenta: 'Perfil | Cuenta'
+    };
+    document.title = `${titles[activeTab] || 'Perfil'} | Anime`;
+  }, [activeTab]);
+
   const [isEditing, setIsEditing] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [editUsername, setEditUsername] = useState(user?.user_metadata?.username || '');

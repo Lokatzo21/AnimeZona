@@ -1,8 +1,6 @@
 .carouselSection {
   margin-bottom: 3rem;
   width: 100%;
-  max-width: 100%;
-  overflow: hidden; /* Evitar que el contenedor crezca más allá de la pantalla */
 }
 
 .title {
@@ -17,6 +15,7 @@
   display: flex;
   align-items: center;
   width: 100%;
+  min-width: 0;
 }
 
 .scrollArea {
