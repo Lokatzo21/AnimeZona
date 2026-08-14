@@ -11,29 +11,30 @@ const SecretZone = () => {
   }, []);
 
   // Función para quitar de la lista secreta si se desea
-  const handleRemoveSecretLike = (animeId) => {
-    setSecretLikes(prev => prev.filter(a => a.id !== animeId));
+  const handleRemove = (animeId) => {
+    setSecretLikes((secretLikes || []).filter(a => a.id !== animeId));
   };
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.title}>🤫 Zona Secreta</h1>
-      <p className={styles.subtitle}>Aquí están los animes a los que les diste un "Me gusta secreto".</p>
+    <div className={styles.secretContainer}>
+      <h1 className={styles.title}>Zona Secreta</h1>
+      <p className={styles.subtitle}>Aquí están los animes que has marcado manteniendo pulsado el botón de favoritos.</p>
       
-      {secretLikes.length === 0 ? (
-        <div className={styles.emptyState}>
-          No tienes animes secretos aún. (Mantén presionado el botón de Me gusta por 3 segundos en cualquier anime).
-        </div>
-      ) : (
+      {(secretLikes || []).length > 0 ? (
         <div className={styles.grid}>
-          {secretLikes.map(anime => (
+          {(secretLikes || []).map(anime => (
             <AnimeCard 
-              key={anime.id}
+              key={`secret-${anime.id}`}
               anime={anime}
               isFavorite={true}
-              onToggleFavorite={() => handleRemoveSecretLike(anime.id)}
+              onToggleFavorite={() => handleRemove(anime.id)}
             />
           ))}
+        </div>
+      ) : (
+        <div className={styles.emptyState}>
+          <p>No tienes animes en tu zona secreta.</p>
+          <small>(Mantén presionado el botón de favoritos en cualquier anime para añadirlo aquí)</small>
         </div>
       )}
     </div>

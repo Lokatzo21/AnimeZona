@@ -121,15 +121,15 @@ const Catalog = () => {
   }, [handleObserver, loaderRef.current]);
 
   const handleToggleFavorite = (anime) => {
-    const isFav = favoriteAnimes.some(a => a.id === anime.id);
+    const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
     if (isFav) {
-      setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== anime.id));
+      setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== anime.id));
     } else {
       setFavoriteAnimes([{
         id: anime.id,
         title: anime.title,
         image: anime.image,
-      }, ...favoriteAnimes]);
+      }, ...(favoriteAnimes || [])]);
     }
   };
 
@@ -138,7 +138,7 @@ const Catalog = () => {
       id: anime.id,
       title: anime.title,
       image: anime.image
-    }, ...hiddenAnimes]);
+    }, ...(hiddenAnimes || [])]);
   };
 
   const setGenreFilter = (genre) => {
@@ -150,7 +150,7 @@ const Catalog = () => {
     }
   };
 
-  const filteredCatalog = catalog.filter(a => !hiddenAnimes.some(h => h.id === a.id));
+  const filteredCatalog = (catalog || []).filter(a => !(hiddenAnimes || []).some(h => h.id === a.id));
 
   return (
     <div className={styles.catalogContainer}>
@@ -182,7 +182,7 @@ const Catalog = () => {
           <AnimeCard 
             key={`catalog-${anime.id}`}
             anime={anime}
-            isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
+            isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
             onToggleFavorite={handleToggleFavorite}
             onHide={handleHide}
           />
@@ -195,7 +195,7 @@ const Catalog = () => {
         </div>
       )}
       
-      {!loading && catalog.length === 0 && (
+      {!loading && (catalog || []).length === 0 && (
         <div className={styles.emptyState}>
           <h3>No se encontraron animes</h3>
           <p>Prueba seleccionando otro género.</p>
