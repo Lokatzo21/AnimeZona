@@ -102,14 +102,9 @@ const Watch = () => {
 
   // Auto-scroll al reproductor cuando cambia el episodio y termina de cargar
   useEffect(() => {
-    if (!loading && videoContainerRef.current) {
+    if (!loading && playerRef.current) {
       setTimeout(() => {
-        // En lugar de scrollIntoView que ignora el navbar fijo, calculamos la posición exacta
-        // Restamos unos 80-100px para compensar la altura del navbar
-        const yOffset = -90; 
-        const element = playerRef.current;
-        const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
-        window.scrollTo({ top: y, behavior: 'smooth' });
+        playerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
     }
 
