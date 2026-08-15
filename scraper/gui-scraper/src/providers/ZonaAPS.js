@@ -131,16 +131,27 @@ class ZonaAPSProvider extends BaseProvider {
         const found = [];
         lis.forEach((li, index) => {
             const h = li.innerHTML.toLowerCase();
+            const text = li.textContent.toLowerCase();
             let isLat = h.includes('mx.png') || h.includes('latino');
             let isSub = h.includes('jp.png') || h.includes('subtitulado');
             
             if (targetLangIdx.lang === 'latino' && isLat) {
-                found.push(index);
+                found.push({ index, text });
             } else if (targetLangIdx.lang === 'sub' && (isSub || (!isLat && !isSub))) {
-                found.push(index);
+                found.push({ index, text });
             }
         });
-        return found; 
+        
+        // Priorizar "Opción 2"
+        found.sort((a, b) => {
+            const aIsOpt2 = a.text.includes('opción 2') || a.text.includes('opcion 2');
+            const bIsOpt2 = b.text.includes('opción 2') || b.text.includes('opcion 2');
+            if (aIsOpt2 && !bIsOpt2) return -1;
+            if (!aIsOpt2 && bIsOpt2) return 1;
+            return 0;
+        });
+
+        return found.map(f => f.index);
     }, targetLanguage);
 
     if (availableOptions.length === 0) {
@@ -175,30 +186,50 @@ class ZonaAPSProvider extends BaseProvider {
                     try {
                         const box = await iframe.boundingBox();
                         if (box && box.width > 0 && box.height > 0) {
+                            // Mover el mouse primero para simular hover
+                            await targetPage.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+                            await new Promise(r => setTimeout(r, 300));
+                            // Luego hacer clic
                             await targetPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-                            await new Promise(r => setTimeout(r, 200));
+                            await new Promise(r => setTimeout(r, 300));
                         }
                     } catch (e) {}
                 }
 
                 // 2. Intentar click vía JS dentro de cada frame (para evadir CORS)
                 for (const frame of targetPage.frames()) {
-                    await frame.evaluate(() => {
-                        const playBtn = document.querySelector('.jw-icon-display') || 
-                                      document.querySelector('.jw-display-icon-container') || 
-                                      document.querySelector('.vjs-big-play-button') || 
-                                      document.querySelector('.plyr__control--overlaid') ||
-                                      document.querySelector('.play-button') ||
-                                      document.querySelector('#play');
-                        if (playBtn && playBtn.offsetHeight > 0) playBtn.click();
-                        
-                        // Click en cualquier poster o imagen gigante que cubra el video
-                        const fakePoster = document.querySelector('.vjs-poster') || document.querySelector('img.poster');
-                        if (fakePoster && fakePoster.offsetHeight > 0) fakePoster.click();
-                        
-                        // Click genérico en el body
-                        if (document.body) document.body.click();
-                    }).catch(() => {});
+                    try {
+                        await Promise.race([
+                            frame.evaluate(() => {
+                                // Intentar forzar play mediante la API nativa de JWPlayer si existe
+                                try {
+                                    if (typeof jwplayer === 'function') {
+                                        jwplayer().play();
+                                    }
+                                } catch (e) {}
+
+                                // Buscar el botón normal
+                                const playBtn = document.querySelector('.jw-icon-display') || 
+                                              document.querySelector('.jw-display-icon-container') || 
+                                              document.querySelector('.vjs-big-play-button') || 
+                                              document.querySelector('.plyr__control--overlaid') ||
+                                              document.querySelector('.play-button') ||
+                                              document.querySelector('#play');
+                                if (playBtn && playBtn.offsetHeight > 0) playBtn.click();
+                                
+                                // Click directo a la imagen de preview por si es un fake poster
+                                const jwPreview = document.querySelector('.jw-preview');
+                                if (jwPreview && jwPreview.offsetHeight > 0) jwPreview.click();
+
+                                const fakePoster = document.querySelector('.vjs-poster') || document.querySelector('img.poster');
+                                if (fakePoster && fakePoster.offsetHeight > 0) fakePoster.click();
+                                
+                                // Click genérico en el body
+                                if (document.body) document.body.click();
+                            }),
+                            new Promise(r => setTimeout(r, 1000))
+                        ]);
+                    } catch(e) {}
                 }
             } catch(e) {}
 
@@ -229,8 +260,15 @@ class ZonaAPSProvider extends BaseProvider {
                   break;
                }
                try {
-                   const v = await frame.$eval('video', el => el.src);
-                   if (v && v.includes('.mp4') && !v.startsWith('blob:')) {
+                   // Usamos evaluate en lugar de $eval para evitar timeouts nativos
+                   const v = await Promise.race([
+                       frame.evaluate(() => {
+                           const vid = document.querySelector('video');
+                           return (vid && vid.src && vid.src.includes('.mp4') && !vid.src.startsWith('blob:')) ? vid.src : null;
+                       }),
+                       new Promise(r => setTimeout(r, 1000))
+                   ]);
+                   if (v) {
                        videoUrl = v;
                        serverName = 'ZONAAPS';
                        break;
