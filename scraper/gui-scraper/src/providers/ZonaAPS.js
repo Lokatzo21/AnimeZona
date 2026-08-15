@@ -10,6 +10,23 @@ class ZonaAPSProvider extends BaseProvider {
     this.log(`Iniciando módulo de ZonaAPS para: ${url}`, 'info');
     
     let targetPage = await this.browser.newPage();
+    
+    // Nivel DIOS: Capturar las solicitudes de red para encontrar el mp4 incluso si el reproductor está ofuscado
+    let networkVideoUrl = null;
+    targetPage.on('request', request => {
+        const reqUrl = request.url();
+        if (reqUrl.includes('.mp4') && !reqUrl.includes('banner') && !reqUrl.includes('ad')) {
+            networkVideoUrl = reqUrl;
+        }
+        request.continue();
+    });
+    await targetPage.setRequestInterception(true);
+
+    // Bloqueador extremo de pop-ups nativo
+    await targetPage.evaluateOnNewDocument(() => {
+        window.open = () => null;
+    });
+
     targetPage.on('dialog', async dialog => {
         try { await dialog.dismiss(); } catch(e) {}
     });
@@ -80,6 +97,25 @@ class ZonaAPSProvider extends BaseProvider {
   async scrapeSingleInner(targetPage, episodeUrl, title, currentEpisodeNumber) {
     this.log(`Procesando Episodio ${currentEpisodeNumber}...`, 'info');
     
+    // Nivel DIOS: Capturar las solicitudes de red
+    let networkVideoUrl = null;
+    if (!targetPage.isIntercepting) {
+        try {
+            await targetPage.setRequestInterception(true);
+            targetPage.isIntercepting = true;
+            targetPage.on('request', request => {
+                const reqUrl = request.url();
+                if (reqUrl.includes('.mp4') && !reqUrl.includes('banner') && !reqUrl.includes('ad')) {
+                    networkVideoUrl = reqUrl;
+                }
+                request.continue();
+            });
+            await targetPage.evaluateOnNewDocument(() => {
+                window.open = () => null;
+            });
+        } catch(e) {}
+    }
+
     const { rows } = await this.client.query(`SELECT language, server_name FROM anime_episodes WHERE search_title = $1 AND episode_number = $2`, [title.toLowerCase(), currentEpisodeNumber]);
     const existingServers = {};
     for (const r of rows) {
@@ -267,6 +303,13 @@ class ZonaAPSProvider extends BaseProvider {
                     } catch(e) {}
                 }
             } catch(e) {}
+
+            if (networkVideoUrl) {
+                videoUrl = networkVideoUrl;
+                serverName = 'ZONAAPS';
+                this.log('¡Video encontrado mediante intercepción de red!', 'success');
+                break;
+            }
 
             const directVideo = await targetPage.evaluate(() => {
                 const videos = Array.from(document.querySelectorAll('video'));
