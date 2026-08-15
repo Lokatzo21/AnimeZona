@@ -46,7 +46,7 @@ const Catalog = () => {
       setIsRestoring(false);
     }
     
-    document.title = `Lokatzo21 | Catálogo - ${selectedGenre}`;
+    document.title = `Catálogo - ${selectedGenre}`;
   }, [selectedGenre]);
 
   // Actualizar caché cuando los datos cambian

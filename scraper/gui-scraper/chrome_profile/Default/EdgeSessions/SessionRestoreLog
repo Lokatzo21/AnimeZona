@@ -80,3 +80,95 @@
 {"logTime": "0813/062638", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
 {"logTime": "0813/062638", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431073556155348, for SessionType SessionRestore"}
 {"logTime": "0813/063038", "session": "END"}
+{"logTime": "0814/040001", "session": "START"}
+{"logTime": "0814/040001", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/040001", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/040001", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/040003", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/040003", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431073762795152, for SessionType SessionRestore"}
+{"logTime": "0814/040554", "session": "END"}
+{"logTime": "0814/041130", "session": "START"}
+{"logTime": "0814/041130", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/041130", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/041130", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/041133", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/041133", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431075998772111, for SessionType SessionRestore"}
+{"logTime": "0814/042226", "session": "END"}
+{"logTime": "0814/042303", "session": "START"}
+{"logTime": "0814/042303", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/042303", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/042303", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/042306", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/042306", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431153603788449, for SessionType SessionRestore"}
+{"logTime": "0814/043550", "session": "END"}
+{"logTime": "0814/043553", "session": "START"}
+{"logTime": "0814/043553", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/043553", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/043553", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/043555", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/043555", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431154293280552, for SessionType SessionRestore"}
+{"logTime": "0814/044027", "session": "END"}
+{"logTime": "0814/044030", "session": "START"}
+{"logTime": "0814/044030", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/044030", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/044030", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/044033", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/044033", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431154986426532, for SessionType SessionRestore"}
+{"logTime": "0814/050528", "session": "END"}
+{"logTime": "0814/050531", "session": "START"}
+{"logTime": "0814/050531", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/050531", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/050531", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/050534", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/050534", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431157395800573, for SessionType SessionRestore"}
+{"logTime": "0814/050534", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431155755751519, for SessionType SessionRestore"}
+{"logTime": "0814/052601", "session": "END"}
+{"logTime": "0814/052633", "session": "START"}
+{"logTime": "0814/052633", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/052633", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/052633", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/052635", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/052635", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431157461964262, for SessionType SessionRestore"}
+{"logTime": "0814/055039", "session": "END"}
+{"logTime": "0814/060329", "session": "START"}
+{"logTime": "0814/060329", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/060329", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/060329", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/060332", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/060332", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431157534021686, for SessionType SessionRestore"}
+{"logTime": "0814/060509", "session": "END"}
+{"logTime": "0814/061803", "session": "START"}
+{"logTime": "0814/061803", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/061803", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/061803", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/061805", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/061805", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431158795844435, for SessionType SessionRestore"}
+{"logTime": "0814/061831", "session": "END"}
+{"logTime": "0814/061834", "session": "START"}
+{"logTime": "0814/061834", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/061834", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/061834", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/061836", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/061836", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431161012265170, for SessionType SessionRestore"}
+{"logTime": "0814/061844", "session": "END"}
+{"logTime": "0814/063239", "session": "START"}
+{"logTime": "0814/063239", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/063239", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/063239", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/063242", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/063242", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431161885832583, for SessionType SessionRestore"}
+{"logTime": "0814/063320", "session": "END"}
+{"logTime": "0814/063943", "session": "START"}
+{"logTime": "0814/063943", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/063943", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/063943", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/063945", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/063945", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431162762165464, for SessionType SessionRestore"}
+{"logTime": "0814/064137", "session": "END"}
+{"logTime": "0814/064417", "session": "START"}
+{"logTime": "0814/064417", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:353 EdgeLogLastSessionExitTypeOnStartup", "message": "Previous Session Exit Type: PreviousSessionExitType::kNormalBrowserShutDown"}
+{"logTime": "0814/064417", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1431 DetermineURLsAndLaunch", "message": "Startup Preference: 0"}
+{"logTime": "0814/064417", "level": "INFO", "location": "chrome\\browser\\ui\\startup\\startup_browser_creator_impl.cc:1433 DetermineURLsAndLaunch", "message": "Browser Open Behavior: 0"}
+{"logTime": "0814/064419", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Valid session file found: SessionRestore"}
+{"logTime": "0814/064419", "level": "INFO", "location": "components\\sessions\\core\\command_storage_manager.cc:618 operator()", "message": "Delete session file Session_13431163069807552, for SessionType SessionRestore"}
+{"logTime": "0814/064523", "session": "END"}

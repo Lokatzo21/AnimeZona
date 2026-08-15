@@ -35,6 +35,8 @@
   height: 100%;
   object-fit: cover;
   transition: transform 0.5s ease;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .card:hover .image {

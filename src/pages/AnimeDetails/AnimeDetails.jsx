@@ -39,9 +39,9 @@ const AnimeDetails = () => {
 
   React.useEffect(() => {
     if (animeInfo) {
-      document.title = `Lokatzo21 | Anime - ${animeInfo.title}`;
+      document.title = `Anime - ${animeInfo.title}`;
     } else {
-      document.title = `Lokatzo21 | Detalles del Anime`;
+      document.title = `Detalles del Anime`;
     }
   }, [animeInfo]);
 

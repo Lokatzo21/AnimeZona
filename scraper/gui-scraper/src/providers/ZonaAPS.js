@@ -167,17 +167,39 @@ class ZonaAPSProvider extends BaseProvider {
 
         for (let attempt = 0; attempt < 20; attempt++) { 
             // Intentar hacer clic en el botón de play por si el video no carga el mp4 hasta interactuar
+            // Intentar hacer clic en el botón de play por si el video no carga el mp4 hasta interactuar
             try {
-                await targetPage.evaluate(() => {
-                    const clickPlay = (doc) => {
-                        const playBtn = doc.querySelector('.jw-icon-display') || doc.querySelector('.jw-display-icon-container') || doc.querySelector('.vjs-big-play-button');
+                // 1. Simular click físico en el centro de cada iframe (ayuda a quitar fake posters)
+                const iframes = await targetPage.$$('iframe');
+                for (const iframe of iframes) {
+                    try {
+                        const box = await iframe.boundingBox();
+                        if (box && box.width > 0 && box.height > 0) {
+                            await targetPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                            await new Promise(r => setTimeout(r, 200));
+                        }
+                    } catch (e) {}
+                }
+
+                // 2. Intentar click vía JS dentro de cada frame (para evadir CORS)
+                for (const frame of targetPage.frames()) {
+                    await frame.evaluate(() => {
+                        const playBtn = document.querySelector('.jw-icon-display') || 
+                                      document.querySelector('.jw-display-icon-container') || 
+                                      document.querySelector('.vjs-big-play-button') || 
+                                      document.querySelector('.plyr__control--overlaid') ||
+                                      document.querySelector('.play-button') ||
+                                      document.querySelector('#play');
                         if (playBtn && playBtn.offsetHeight > 0) playBtn.click();
-                    };
-                    clickPlay(document);
-                    document.querySelectorAll('iframe').forEach(ifr => {
-                        try { clickPlay(ifr.contentWindow.document); } catch(e) {}
-                    });
-                });
+                        
+                        // Click en cualquier poster o imagen gigante que cubra el video
+                        const fakePoster = document.querySelector('.vjs-poster') || document.querySelector('img.poster');
+                        if (fakePoster && fakePoster.offsetHeight > 0) fakePoster.click();
+                        
+                        // Click genérico en el body
+                        if (document.body) document.body.click();
+                    }).catch(() => {});
+                }
             } catch(e) {}
 
             const directVideo = await targetPage.evaluate(() => {

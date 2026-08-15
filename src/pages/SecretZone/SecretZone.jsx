@@ -12,7 +12,7 @@ const SecretZone = () => {
   };
 
   React.useEffect(() => {
-    document.title = "Lokatzo21 | Secreto";
+    document.title = "Secreto";
   }, []);
 
   return (

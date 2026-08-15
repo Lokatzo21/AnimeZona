@@ -30,7 +30,7 @@ const Home = () => {
       setLoading(false);
     };
 
-    document.title = "Lokatzo21 | Inicio";
+    document.title = "Inicio";
     fetchHomeData();
   }, []);
 

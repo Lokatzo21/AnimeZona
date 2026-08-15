@@ -106,7 +106,7 @@ const Watch = () => {
       setTimeout(() => {
         // En lugar de scrollIntoView que ignora el navbar fijo, calculamos la posición exacta
         // Restamos unos 80-100px para compensar la altura del navbar
-        const yOffset = -75; 
+        const yOffset = -105; 
         const element = videoContainerRef.current;
         const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
         window.scrollTo({ top: y, behavior: 'smooth' });
@@ -155,9 +155,9 @@ const Watch = () => {
 
   React.useEffect(() => {
     if (animeInfo) {
-      document.title = `Lokatzo21 | Viendo ${animeInfo.title} - Episodio ${episode}`;
+      document.title = `Viendo ${animeInfo.title} - Episodio ${episode}`;
     } else {
-      document.title = `Lokatzo21 | Viendo Anime`;
+      document.title = `Viendo Anime`;
     }
   }, [animeInfo, episode]);
 

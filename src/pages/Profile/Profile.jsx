@@ -31,7 +31,7 @@ const Profile = () => {
       ocultos: 'Perfil | Animes Ocultos',
       cuenta: 'Perfil | Cuenta'
     };
-    document.title = `Lokatzo21 | ${titles[activeTab] || 'Perfil'}`;
+    document.title = `${titles[activeTab] || 'Perfil'}`;
   }, [activeTab]);
 
   const handleToggleFavorite = (anime) => {
