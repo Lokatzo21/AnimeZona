@@ -14,7 +14,6 @@ const Home = () => {
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
-  const { user } = useAuth();
 
   useEffect(() => {
     const fetchHomeData = async () => {

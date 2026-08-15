@@ -1,6 +1,6 @@
-2026/08/14-00:44:25.490 2418 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/08/14-00:44:25.491 2418 Recovering log #78
-2026/08/14-00:44:25.493 2418 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\EdgeCoupons/coupons_data.db/000078.log 
-2026/08/14-00:44:25.632 2b0 Level-0 table #82: started
-2026/08/14-00:44:25.640 2b0 Level-0 table #82: 683376 bytes OK
-2026/08/14-00:44:25.641 2b0 Delete type=0 #78
+2026/08/14-22:45:14.478 31b0 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/08/14-22:45:14.479 31b0 Recovering log #127
+2026/08/14-22:45:14.480 31b0 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\EdgeCoupons/coupons_data.db/000127.log 
+2026/08/14-22:45:14.555 47e4 Level-0 table #131: started
+2026/08/14-22:45:14.562 47e4 Level-0 table #131: 683376 bytes OK
+2026/08/14-22:45:14.564 47e4 Delete type=0 #127

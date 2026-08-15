@@ -1,3 +1,14 @@
-2026/08/14-00:44:21.441 2b0 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\WebStorage\12\IndexedDB\indexeddb.leveldb/MANIFEST-000001
-2026/08/14-00:44:21.442 2b0 Recovering log #3
-2026/08/14-00:44:21.445 2b0 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\WebStorage\12\IndexedDB\indexeddb.leveldb/000003.log 
+2026/08/14-22:45:31.316 47e4 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\WebStorage\12\IndexedDB\indexeddb.leveldb/MANIFEST-000001
+2026/08/14-22:45:31.316 47e4 Recovering log #51
+2026/08/14-22:45:31.317 47e4 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\WebStorage\12\IndexedDB\indexeddb.leveldb/000051.log 
+2026/08/14-22:45:34.719 47e4 Manual compaction at level-0 from '\x00\x18\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/08/14-22:45:34.746 47e4 Level-0 table #56: started
+2026/08/14-22:45:34.750 47e4 Level-0 table #56: 37092 bytes OK
+2026/08/14-22:45:34.755 47e4 Delete type=0 #51
+2026/08/14-22:45:34.756 47e4 Manual compaction at level-0 from '\x00\x17\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x18\x00\x00\x00' @ 0 : 0; will stop at '\x00\x19\x01\x1f\x04\x03\x01\x06\x00Q\x00U\x00E\x00U\x00E\x00D\x03\x00\x00\x00\x00\x00\x00L@\x03\x00\xa0\xd1\xd4;\x00zB\x00\x03\x00\x00\x00\x00\x00\x00\xf0?' @ 3412 : 1
+2026/08/14-22:45:34.756 47e4 Compacting 1@0 + 1@1 files
+2026/08/14-22:45:34.759 47e4 Generated table #57@0: 208 keys, 7340 bytes
+2026/08/14-22:45:34.759 47e4 Compacted 1@0 + 1@1 files => 7340 bytes
+2026/08/14-22:45:34.762 47e4 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/08/14-22:45:34.764 47e4 Delete type=2 #56
+2026/08/14-22:45:34.765 47e4 Manual compaction at level-0 from '\x00\x19\x01\x1f\x04\x03\x01\x06\x00Q\x00U\x00E\x00U\x00E\x00D\x03\x00\x00\x00\x00\x00\x00L@\x03\x00\xa0\xd1\xd4;\x00zB\x00\x03\x00\x00\x00\x00\x00\x00\xf0?' @ 3412 : 1 .. '\x00\x18\x00\x00\x00' @ 0 : 0; will stop at (end)

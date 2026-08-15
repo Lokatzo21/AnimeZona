@@ -1,2 +1,3 @@
-2026/08/14-00:40:55.278 52b0 Creating DB C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\devtools_devtools_0.indexeddb.leveldb since it was missing.
-2026/08/14-00:40:55.305 52b0 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\devtools_devtools_0.indexeddb.leveldb/MANIFEST-000001
+2026/08/14-22:45:55.236 2604 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\devtools_devtools_0.indexeddb.leveldb/MANIFEST-000001
+2026/08/14-22:45:55.237 2604 Recovering log #3
+2026/08/14-22:45:55.237 2604 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\devtools_devtools_0.indexeddb.leveldb/000003.log 

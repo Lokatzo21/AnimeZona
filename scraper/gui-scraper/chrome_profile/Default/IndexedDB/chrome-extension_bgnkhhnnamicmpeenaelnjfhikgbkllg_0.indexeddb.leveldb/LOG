@@ -1,16 +1,16 @@
-2026/08/14-00:44:23.033 2b0 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\chrome-extension_bgnkhhnnamicmpeenaelnjfhikgbkllg_0.indexeddb.leveldb/MANIFEST-000001
-2026/08/14-00:44:23.034 2b0 Recovering log #100
-2026/08/14-00:44:23.035 2b0 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\chrome-extension_bgnkhhnnamicmpeenaelnjfhikgbkllg_0.indexeddb.leveldb/000100.log 
-2026/08/14-00:44:23.036 2b0 Delete type=2 #97
-2026/08/14-00:44:23.036 2b0 Delete type=2 #98
-2026/08/14-00:44:23.060 447c Level-0 table #106: started
-2026/08/14-00:44:23.065 447c Level-0 table #106: 621 bytes OK
-2026/08/14-00:44:23.068 447c Delete type=0 #100
-2026/08/14-00:44:23.069 2b0 Manual compaction at level-0 from '\x00\x18\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at '\x00\x18\x00\x00\x05' @ 4759 : 1
-2026/08/14-00:44:23.069 2b0 Compacting 1@0 + 2@1 files
-2026/08/14-00:44:23.096 2b0 Generated table #107@0: 1692 keys, 2121217 bytes
-2026/08/14-00:44:23.104 2b0 Generated table #108@0: 571 keys, 542565 bytes
-2026/08/14-00:44:23.105 2b0 Compacted 1@0 + 2@1 files => 2663782 bytes
-2026/08/14-00:44:23.106 2b0 compacted to: files[ 0 2 1 0 0 0 0 ]
-2026/08/14-00:44:23.107 2b0 Delete type=2 #106
-2026/08/14-00:44:23.108 2b0 Manual compaction at level-0 from '\x00\x18\x00\x00\x05' @ 4759 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/08/14-22:45:13.937 47e4 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\chrome-extension_bgnkhhnnamicmpeenaelnjfhikgbkllg_0.indexeddb.leveldb/MANIFEST-000001
+2026/08/14-22:45:13.938 47e4 Recovering log #175
+2026/08/14-22:45:13.939 47e4 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper\chrome_profile\Default\IndexedDB\chrome-extension_bgnkhhnnamicmpeenaelnjfhikgbkllg_0.indexeddb.leveldb/000175.log 
+2026/08/14-22:45:13.939 47e4 Delete type=2 #172
+2026/08/14-22:45:13.939 47e4 Delete type=2 #173
+2026/08/14-22:45:13.989 1314 Level-0 table #181: started
+2026/08/14-22:45:13.994 1314 Level-0 table #181: 610 bytes OK
+2026/08/14-22:45:13.995 1314 Delete type=0 #175
+2026/08/14-22:45:13.996 47e4 Manual compaction at level-0 from '\x00'\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00(\x00\x00\x00' @ 0 : 0; will stop at '\x00'\x00\x00\x05' @ 5044 : 1
+2026/08/14-22:45:13.996 47e4 Compacting 1@0 + 2@1 files
+2026/08/14-22:45:14.029 47e4 Generated table #182@0: 1707 keys, 2121839 bytes
+2026/08/14-22:45:14.040 47e4 Generated table #183@0: 571 keys, 542565 bytes
+2026/08/14-22:45:14.040 47e4 Compacted 1@0 + 2@1 files => 2664404 bytes
+2026/08/14-22:45:14.042 47e4 compacted to: files[ 0 2 1 0 0 0 0 ]
+2026/08/14-22:45:14.042 47e4 Delete type=2 #181
+2026/08/14-22:45:14.043 47e4 Manual compaction at level-0 from '\x00'\x00\x00\x05' @ 5044 : 1 .. '\x00(\x00\x00\x00' @ 0 : 0; will stop at (end)
