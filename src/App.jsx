@@ -5,6 +5,7 @@ import AnimeDetails from './pages/AnimeDetails/AnimeDetails';
 import Watch from './pages/Watch/Watch';
 import Profile from './pages/Profile/Profile';
 import Catalog from './pages/Catalog/Catalog';
+import SecretZone from './pages/SecretZone/SecretZone';
 import './App.css';
 
 import { AuthProvider } from './contexts/AuthContext';
@@ -25,6 +26,7 @@ function App() {
             <Route path="/anime/:id" element={<AnimeDetails />} />
             <Route path="/watch/:id/:episode" element={<Watch />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/secret" element={<SecretZone />} />
             <Route path="/catalog" element={<Catalog />} />
             <Route path="/login" element={<Login />} />
           </Routes>

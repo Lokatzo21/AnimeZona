@@ -70,8 +70,7 @@ const Navbar = () => {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       if (searchQuery.trim().toLowerCase() === 'secreto') {
-        sessionStorage.setItem('secretModeUnlocked', 'true');
-        navigate('/profile');
+        navigate('/secret');
         setSearchQuery('');
         setSearchResults([]);
         setIsMobileMenuOpen(false);

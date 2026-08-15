@@ -13,11 +13,7 @@ const Profile = () => {
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
-  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
-  const [secretContinueWatching, setSecretContinueWatching] = useLocalStorage('secretContinueWatching', []);
-  const [secretWatchedAnimes, setSecretWatchedAnimes] = useLocalStorage('secretWatchedAnimes', []);
   const [activeTab, setActiveTab] = useState('historial');
-  const isSecretUnlocked = sessionStorage.getItem('secretModeUnlocked') === 'true';
 
   const [isEditing, setIsEditing] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -29,14 +25,15 @@ const Profile = () => {
   };
 
   React.useEffect(() => {
-    const titles = {
-      historial: 'Perfil | Historial',
-      favoritos: 'Perfil | Favoritos',
-      ocultos: 'Perfil | Animes Ocultos',
-      cuenta: 'Perfil | Cuenta',
-      secreto: 'Perfil | Secreto'
-    };
-    document.title = `${titles[activeTab] || 'Perfil'}`;
+    if (activeTab === 'historial') {
+      document.title = "Mi Historial | AnimeZona";
+    } else if (activeTab === 'favoritos') {
+      document.title = "Mis Favoritos | AnimeZona";
+    } else if (activeTab === 'ocultos') {
+      document.title = "Animes Ocultos | AnimeZona";
+    } else if (activeTab === 'cuenta') {
+      document.title = "Mi Cuenta | AnimeZona";
+    }
   }, [activeTab]);
 
   const handleToggleFavorite = (anime) => {
@@ -54,7 +51,6 @@ const Profile = () => {
 
   const handleRemoveContinue = (animeId) => {
     setContinueWatching((continueWatching || []).filter(a => a.id !== animeId));
-    setSecretContinueWatching((secretContinueWatching || []).filter(a => a.id !== animeId));
   };
 
   const handleSaveProfile = async () => {
@@ -151,15 +147,6 @@ const Profile = () => {
         >
           Cuenta
         </button>
-        {isSecretUnlocked && (
-          <button 
-            className={`${styles.tabBtn} ${activeTab === 'secreto' ? styles.active : ''}`}
-            onClick={() => setActiveTab('secreto')}
-            style={{ color: activeTab === 'secreto' ? '#a855f7' : '#d8b4fe' }}
-          >
-            Secreto
-          </button>
-        )}
       </div>
 
       <div className={styles.content}>
@@ -216,8 +203,6 @@ const Profile = () => {
             )}
           </div>
         )}
-
-
 
         {activeTab === 'ocultos' && (
           <div>
@@ -279,54 +264,6 @@ const Profile = () => {
                 )}
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'secreto' && isSecretUnlocked && (
-          <div className={styles.secretoSection}>
-            <h2 className={styles.sectionTitle} style={{ color: '#a855f7' }}>Continuar Viendo (Secreto)</h2>
-            {(secretContinueWatching || []).length === 0 ? (
-              <p className={styles.emptyMsg}>No tienes episodios pendientes en modo secreto.</p>
-            ) : (
-              <div className={styles.grid}>
-                {(secretContinueWatching || []).map(anime => (
-                  <AnimeCard 
-                    key={`secrethistory-${anime.id}`} 
-                    anime={anime} 
-                    onRemoveContinue={handleRemoveContinue}
-                  />
-                ))}
-              </div>
-            )}
-
-            <h2 className={styles.sectionTitle} style={{ marginTop: '3rem', color: '#a855f7' }}>Animes Vistos (Secreto)</h2>
-            {(secretWatchedAnimes || []).length === 0 ? (
-              <p className={styles.emptyMsg}>Aún no has marcado ningún anime secreto como visto.</p>
-            ) : (
-              <div className={styles.grid}>
-                {(secretWatchedAnimes || []).map(anime => (
-                  <AnimeCard 
-                    key={`secretwatched-${anime.id}`} 
-                    anime={anime} 
-                    isWatched={true} 
-                  />
-                ))}
-              </div>
-            )}
-
-            <h2 className={styles.sectionTitle} style={{ marginTop: '3rem', color: '#a855f7' }}>Me Gusta (Secretos)</h2>
-            {(secretLikes || []).length === 0 ? (
-              <p className={styles.emptyMsg}>No tienes animes favoritos en secreto.</p>
-            ) : (
-              <div className={styles.grid}>
-                {(secretLikes || []).map(anime => (
-                  <AnimeCard 
-                    key={`secretlike-${anime.id}`} 
-                    anime={anime}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
