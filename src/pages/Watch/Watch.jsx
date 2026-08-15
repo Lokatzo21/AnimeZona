@@ -103,7 +103,12 @@ const Watch = () => {
   useEffect(() => {
     if (!loading && playerRef.current) {
       setTimeout(() => {
-        playerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // En lugar de scrollIntoView que ignora el navbar fijo, calculamos la posición exacta
+        // Restamos unos 80-100px para compensar la altura del navbar
+        const yOffset = -80; 
+        const element = playerRef.current;
+        const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
+        window.scrollTo({ top: y, behavior: 'smooth' });
       }, 300);
     }
 
