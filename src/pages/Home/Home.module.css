@@ -43,8 +43,8 @@
 
 .animeGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1.5rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 1.2rem 0.5rem;
 }
 
 @media (min-width: 768px) {
