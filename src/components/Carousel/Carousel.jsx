@@ -29,7 +29,7 @@ const Carousel = ({ title, children }) => {
           <ChevronLeft size={24} />
         </button>
         
-        <div className={styles.scrollWrapper} ref={scrollRef}>
+        <div className={styles.scrollArea} ref={scrollRef}>
           {children}
         </div>
 
