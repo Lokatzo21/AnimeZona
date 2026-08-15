@@ -114,20 +114,27 @@ const AnimeDetails = () => {
     const globalEpId = `${animeInfo.id}-${epId}`;
     
     if (watchedEpisodes.includes(globalEpId)) {
-      const newWatched = watchedEpisodes.filter(id => id !== globalEpId);
-      setWatchedEpisodes(newWatched);
+      setWatchedEpisodes(prev => {
+        const currentList = prev || [];
+        return currentList.filter(id => id !== globalEpId);
+      });
       
       // Si ya no queda NINGÚN episodio visto de este anime, lo quitamos de "Continuar Viendo"
-      const hasWatchedAny = newWatched.some(id => id.startsWith(`${animeInfo.id}-`));
-      if (!hasWatchedAny) {
-        setContinueWatching(continueWatching.filter(a => String(a.id) !== String(animeInfo.id)));
-        setWatchedAnimes(watchedAnimes.filter(a => String(a.id) !== String(animeInfo.id)));
-      }
+      setWatchedEpisodes(prevWatched => {
+        const hasWatchedAny = prevWatched.some(id => id.startsWith(`${animeInfo.id}-`));
+        if (!hasWatchedAny) {
+          setContinueWatching(prev => (prev || []).filter(a => String(a.id) !== String(animeInfo.id)));
+          setWatchedAnimes(prev => (prev || []).filter(a => String(a.id) !== String(animeInfo.id)));
+        }
+        return prevWatched; // don't change it here, just read it
+      });
+
     } else {
-      setWatchedEpisodes([globalEpId, ...watchedEpisodes]);
+      setWatchedEpisodes(prev => [globalEpId, ...(prev || [])]);
       
       // Añadir a Continuar Viendo
-      if (!continueWatching.some(a => String(a.id) === String(animeInfo.id))) {
+      setContinueWatching(prev => {
+        const currentList = prev || [];
         const animeData = {
           id: animeInfo.id,
           title: animeInfo.title,
@@ -135,29 +142,23 @@ const AnimeDetails = () => {
           episodeNumber: epId,
           episodeId: epId
         };
-        setContinueWatching([animeData, ...continueWatching].slice(0, 20));
-      } else {
-        // Actualizar el episodio en continuar viendo si ya estaba
-        const filtered = continueWatching.filter(a => String(a.id) !== String(animeInfo.id));
-        const animeData = {
-          id: animeInfo.id,
-          title: animeInfo.title,
-          image: animeInfo.image,
-          episodeNumber: epId,
-          episodeId: epId
-        };
-        setContinueWatching([animeData, ...filtered].slice(0, 20));
-      }
+        const filtered = currentList.filter(a => String(a.id) !== String(animeInfo.id));
+        return [animeData, ...filtered].slice(0, 20);
+      });
 
       // Añadir a Historial
-      if (!watchedAnimes.some(a => String(a.id) === String(animeInfo.id))) {
-        setWatchedAnimes([{
-          id: animeInfo.id,
-          title: animeInfo.title,
-          image: animeInfo.image,
-          status: animeInfo.status
-        }, ...watchedAnimes]);
-      }
+      setWatchedAnimes(prev => {
+        const currentList = prev || [];
+        if (!currentList.some(a => String(a.id) === String(animeInfo.id))) {
+          return [{
+            id: animeInfo.id,
+            title: animeInfo.title,
+            image: animeInfo.image,
+            status: animeInfo.status
+          }, ...currentList];
+        }
+        return currentList;
+      });
     }
   };
 

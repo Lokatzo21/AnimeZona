@@ -327,6 +327,9 @@ const Watch = () => {
                         ref={nativeVideoRef}
                         src={activeServer.url} 
                         controls 
+                        playsInline
+                        preload="metadata"
+                        poster={animeInfo?.image || ''}
                         className={styles.iframe}
                         onLoadedMetadata={handleVideoLoaded}
                         onTimeUpdate={handleTimeUpdate}
