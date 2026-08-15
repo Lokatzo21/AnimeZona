@@ -203,6 +203,14 @@ class ZonaAPSProvider extends BaseProvider {
         for (let attempt = 0; attempt < 20; attempt++) { 
             // Intentar hacer clic en el botón de play por si el video no carga el mp4 hasta interactuar
             // Intentar hacer clic en el botón de play por si el video no carga el mp4 hasta interactuar
+            // Eliminar widgets de chat y capas superpuestas que bloquean el clic
+            await targetPage.evaluate(() => {
+                const removeSelectors = ['#chatango', '[id*="OMW"]', '.chatango-overlay', '.ad-overlay', '[style*="z-index: 2147483647"]'];
+                removeSelectors.forEach(sel => {
+                    document.querySelectorAll(sel).forEach(el => el.remove());
+                });
+            });
+
             try {
                 // 1. Simular click físico en el centro de cada iframe (ayuda a quitar fake posters)
                 const iframes = await targetPage.$$('iframe');
@@ -212,10 +220,13 @@ class ZonaAPSProvider extends BaseProvider {
                         if (box && box.width > 0 && box.height > 0) {
                             // Mover el mouse primero para simular hover
                             await targetPage.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-                            await new Promise(r => setTimeout(r, 300));
-                            // Luego hacer clic
-                            await targetPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-                            await new Promise(r => setTimeout(r, 300));
+                            await new Promise(r => setTimeout(r, 500));
+                            
+                            // Hacer clic múltiples veces para romper las capas de anuncios invisibles (popunders)
+                            for (let clickCount = 0; clickCount < 3; clickCount++) {
+                                await targetPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                                await new Promise(r => setTimeout(r, 500));
+                            }
                         }
                     } catch (e) {}
                 }
