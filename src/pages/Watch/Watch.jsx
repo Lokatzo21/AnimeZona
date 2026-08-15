@@ -25,6 +25,7 @@ const Watch = () => {
   const sidebarListRef = useRef(null);
   const activeEpisodeRef = useRef(null);
   const nativeVideoRef = useRef(null);
+  const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
 
   useEffect(() => {
@@ -101,12 +102,12 @@ const Watch = () => {
 
   // Auto-scroll al reproductor cuando cambia el episodio y termina de cargar
   useEffect(() => {
-    if (!loading && playerRef.current) {
+    if (!loading && videoContainerRef.current) {
       setTimeout(() => {
         // En lugar de scrollIntoView que ignora el navbar fijo, calculamos la posición exacta
         // Restamos unos 80-100px para compensar la altura del navbar
-        const yOffset = -80; 
-        const element = playerRef.current;
+        const yOffset = -75; 
+        const element = videoContainerRef.current;
         const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
         window.scrollTo({ top: y, behavior: 'smooth' });
       }, 300);
@@ -323,7 +324,7 @@ const Watch = () => {
       <div className={styles.watchLayout}>
         <div className={styles.mainContent}>
           <div className={styles.playerSection}>
-            <div className={styles.playerContainer}>
+            <div className={styles.playerContainer} ref={videoContainerRef}>
               <div className={styles.videoWrapper}>
                 {activeServer ? (
                   activeServer?.url?.includes('.mp4') ? (
