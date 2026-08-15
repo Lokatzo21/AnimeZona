@@ -102,9 +102,9 @@ const Watch = () => {
 
   // Auto-scroll al reproductor cuando cambia el episodio y termina de cargar
   useEffect(() => {
-    if (!loading && playerRef.current) {
+    if (!loading && videoContainerRef.current) {
       setTimeout(() => {
-        playerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        videoContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 300);
     }
 
