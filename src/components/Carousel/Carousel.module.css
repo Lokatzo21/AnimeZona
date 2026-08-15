@@ -1,5 +1,7 @@
 .carouselSection {
   margin-bottom: 3rem;
+  width: 100% !important;
+  max-width: 100vw !important;
 }
 
 .title {
@@ -11,12 +13,18 @@
 
 .carouselContainer {
   position: relative;
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center;
+  width: 100% !important;
 }
 
 .scrollArea {
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
   gap: 1.5rem;
   overflow-x: auto;
   scroll-behavior: smooth;
