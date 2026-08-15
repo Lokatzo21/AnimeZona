@@ -11,12 +11,11 @@ const AnimeDetails = () => {
   const [animeInfo, setAnimeInfo] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [secretLikes = [], setSecretLikes] = useLocalStorage('secretLikes', []);
-  const [watchedEpisodes = [], setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
-  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [watchedAnimes = [], setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
+  const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
+  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const navigate = useNavigate();
   const { showToast, showConfirm } = useUI();
   
@@ -26,63 +25,45 @@ const AnimeDetails = () => {
   useEffect(() => {
     const fetchInfo = async () => {
       setLoading(true);
-      setError(false);
-      try {
-        // Hard timeout: si tarda más de 15s, terminamos con error
-        const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
-        
-        const info = await Promise.race([
-          api.getAnimeInfo(id),
-          timeout(12000)
-        ]).catch(() => null);
-
-        const eps = await Promise.race([
-          api.getAnimeEpisodes(id, info),
-          timeout(15000)
-        ]).catch(() => []);
-        
-        setAnimeInfo(info);
-        setEpisodes(Array.isArray(eps) ? eps : []);
-        if (!info) setError(true);
-      } catch (e) {
-        console.error('fetchInfo failed:', e);
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
+      // Fetch secuencial para evitar rate limit de Jikan
+      const info = await api.getAnimeInfo(id);
+      await new Promise(r => setTimeout(r, 400));
+      const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
+      
+      setAnimeInfo(info);
+      setEpisodes(eps);
+      setLoading(false);
     };
     fetchInfo();
   }, [id]);
 
+  React.useEffect(() => {
+    if (animeInfo) {
+      document.title = `Lokatzo21 | Anime - ${animeInfo.title}`;
+    } else {
+      document.title = `Lokatzo21 | Detalles del Anime`;
+    }
+  }, [animeInfo]);
+
   const handleClearWatched = () => {
     // Filtrar para quitar todos los de este anime
-    const newWatched = (watchedEpisodes || []).filter(id => !id.startsWith(`${animeInfo.id}-`));
+    const newWatched = watchedEpisodes.filter(id => !id.startsWith(`${animeInfo.id}-`));
     setWatchedEpisodes(newWatched);
     
     // También limpiamos el anime de "Continuar viendo" y "Animes vistos"
-    setContinueWatching((continueWatching || []).filter(a => String(a.id) !== String(animeInfo.id)));
-    setWatchedAnimes((watchedAnimes || []).filter(a => String(a.id) !== String(animeInfo.id)));
+    setContinueWatching(continueWatching.filter(a => String(a.id) !== String(animeInfo.id)));
+    setWatchedAnimes(watchedAnimes.filter(a => String(a.id) !== String(animeInfo.id)));
   };
 
   if (loading) {
     return <div className={styles.loading}>Cargando información del anime...</div>;
   }
 
-  if (error || !animeInfo) {
-    return (
-      <div className={styles.loading} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-        <p>No se pudo cargar este anime.</p>
-        <button 
-          onClick={() => window.location.reload()}
-          style={{ padding: '0.5rem 1.5rem', background: '#e11d48', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '1rem' }}
-        >
-          Reintentar
-        </button>
-      </div>
-    );
+  if (!animeInfo) {
+    return <div className={styles.loading}>Error al cargar el anime.</div>;
   }
 
-  const isFavorite = (favoriteAnimes || []).some(a => a.id === animeInfo.id);
+  const isFavorite = favoriteAnimes.some(a => a.id === animeInfo.id);
 
   const startPress = (e) => {
     if (e.button && e.button !== 0) return; // Ignore right clicks
@@ -91,9 +72,9 @@ const AnimeDetails = () => {
     
     pressTimer.current = setTimeout(() => {
       isLongPress.current = true;
-      const isSecret = (secretLikes || []).some(a => a.id === animeInfo.id);
+      const isSecret = secretLikes.some(a => a.id === animeInfo.id);
       if (!isSecret) {
-        setSecretLikes(prev => [{ id: animeInfo.id, title: animeInfo.title, image: animeInfo.image }, ...(prev || [])]);
+        setSecretLikes(prev => [{ id: animeInfo.id, title: animeInfo.title, image: animeInfo.image }, ...prev]);
         showToast("Listo :)");
       } else {
         showToast("Ya está en tus secretos");
@@ -116,70 +97,67 @@ const AnimeDetails = () => {
 
     if (isFavorite) {
       showConfirm("¿Estás seguro que deseas quitar este anime de tus favoritos?", () => {
-        setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== animeInfo.id));
+        setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== animeInfo.id));
       });
     } else {
       setFavoriteAnimes([{
         id: animeInfo.id,
         title: animeInfo.title,
         image: animeInfo.image,
-      }, ...(favoriteAnimes || [])]);
+      }, ...favoriteAnimes]);
     }
   };
-
-  useEffect(() => {
-    if (animeInfo) {
-      document.title = `${animeInfo.title} | Anime`;
-    } else {
-      document.title = 'Detalles | Anime';
-    }
-  }, [animeInfo]);
 
   const handleToggleEpisodeWatched = (e, epId) => {
     e.preventDefault(); // Evitar que navegue al episodio
     e.stopPropagation();
     const globalEpId = `${animeInfo.id}-${epId}`;
     
-    if ((watchedEpisodes || []).includes(globalEpId)) {
-      const newWatched = (watchedEpisodes || []).filter(id => id !== globalEpId);
+    if (watchedEpisodes.includes(globalEpId)) {
+      const newWatched = watchedEpisodes.filter(id => id !== globalEpId);
       setWatchedEpisodes(newWatched);
       
       // Si ya no queda NINGÚN episodio visto de este anime, lo quitamos de "Continuar Viendo"
       const hasWatchedAny = newWatched.some(id => id.startsWith(`${animeInfo.id}-`));
       if (!hasWatchedAny) {
-        setContinueWatching((continueWatching || []).filter(a => String(a.id) !== String(animeInfo.id)));
-        setWatchedAnimes((watchedAnimes || []).filter(a => String(a.id) !== String(animeInfo.id)));
+        setContinueWatching(continueWatching.filter(a => String(a.id) !== String(animeInfo.id)));
+        setWatchedAnimes(watchedAnimes.filter(a => String(a.id) !== String(animeInfo.id)));
       }
     } else {
-      setWatchedEpisodes([globalEpId, ...(watchedEpisodes || [])]);
+      setWatchedEpisodes([globalEpId, ...watchedEpisodes]);
       
-      // Añadir a Continuar Viendo y Animes Vistos
-      const animeData = {
-        id: animeInfo.id,
-        title: animeInfo.title,
-        image: animeInfo.image,
-        episodeNumber: epId,
-        episodeId: epId
-      };
-      
-      setContinueWatching((continueWatching || []).filter(item => String(item.id) !== String(animeInfo.id))); // Quitar el viejo para ponerlo arriba
-      setContinueWatching(prev => {
-        const filtered = (prev || []).filter(item => String(item.id) !== String(animeInfo.id));
-        return [animeData, ...filtered].slice(0, 20);
-      });
+      // Añadir a Continuar Viendo
+      if (!continueWatching.some(a => String(a.id) === String(animeInfo.id))) {
+        const animeData = {
+          id: animeInfo.id,
+          title: animeInfo.title,
+          image: animeInfo.image,
+          episodeNumber: epId,
+          episodeId: epId
+        };
+        setContinueWatching([animeData, ...continueWatching].slice(0, 20));
+      } else {
+        // Actualizar el episodio en continuar viendo si ya estaba
+        const filtered = continueWatching.filter(a => String(a.id) !== String(animeInfo.id));
+        const animeData = {
+          id: animeInfo.id,
+          title: animeInfo.title,
+          image: animeInfo.image,
+          episodeNumber: epId,
+          episodeId: epId
+        };
+        setContinueWatching([animeData, ...filtered].slice(0, 20));
+      }
 
-      setWatchedAnimes(prev => {
-        const currentList = prev || [];
-        if (!currentList.some(a => String(a.id) === String(animeInfo.id))) {
-          return [{
-            id: animeInfo.id,
-            title: animeInfo.title,
-            image: animeInfo.image,
-            status: animeInfo.status
-          }, ...currentList];
-        }
-        return currentList;
-      });
+      // Añadir a Historial
+      if (!watchedAnimes.some(a => String(a.id) === String(animeInfo.id))) {
+        setWatchedAnimes([{
+          id: animeInfo.id,
+          title: animeInfo.title,
+          image: animeInfo.image,
+          status: animeInfo.status
+        }, ...watchedAnimes]);
+      }
     }
   };
 
@@ -232,10 +210,10 @@ const AnimeDetails = () => {
       {/* Lista de Episodios */}
       <div className={styles.episodesSection}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Episodios ({(episodes || []).length})</h2>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Episodios ({episodes.length})</h2>
           
           {/* Botón para limpiar vistos */}
-          {(episodes || []).some(ep => (watchedEpisodes || []).includes(`${animeInfo.id}-${ep.id}`)) && (
+          {episodes.some(ep => watchedEpisodes.includes(`${animeInfo.id}-${ep.id}`)) && (
             <button 
               onClick={handleClearWatched}
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'rgba(30, 41, 59, 0.8)', color: '#cbd5e1', fontSize: '0.875rem', fontWeight: 500, borderRadius: '0.5rem', border: '1px solid #334155', cursor: 'pointer' }}
@@ -249,9 +227,9 @@ const AnimeDetails = () => {
           )}
         </div>
         <div className={styles.episodesGrid}>
-          {(episodes || []).map(ep => {
+          {episodes.map(ep => {
             const globalEpId = `${animeInfo.id}-${ep.id}`;
-            const isEpWatched = (watchedEpisodes || []).includes(globalEpId);
+            const isEpWatched = watchedEpisodes.includes(globalEpId);
             
             return (
               <Link 

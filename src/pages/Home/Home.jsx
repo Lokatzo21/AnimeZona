@@ -17,7 +17,6 @@ const Home = () => {
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, anime: null, section: null });
 
   useEffect(() => {
-    document.title = 'Inicio | Anime';
     const fetchHomeData = async () => {
       setLoading(true);
       // Ejecutar secuencialmente con un pequeño retraso para evitar el error 429 (Too Many Requests) de Jikan
@@ -31,6 +30,7 @@ const Home = () => {
       setLoading(false);
     };
 
+    document.title = "Lokatzo21 | Inicio";
     fetchHomeData();
   }, []);
 
@@ -129,24 +129,27 @@ const Home = () => {
       </Carousel>
 
 
-      {/* Animes Recomendados (De todos los animes existentes) */}
-      <Carousel title="Animes Recomendados (Catálogo Global)">
+      {/* Animes Recomendados (De todos los animes existentes - Grid) */}
+      <section className={styles.allTimeSection}>
+        <h2 className={styles.gridTitle}>Animes Recomendados (Catálogo Global)</h2>
         {loading ? (
           <p className={styles.loadingText}>Cargando catálogo...</p>
         ) : (
-          allTimeAnime
-            .filter(a => !hiddenAnimes.some(h => h.id === a.id))
-            .map(anime => (
-            <AnimeCard 
-              key={`alltime-${anime.id}`}
-              anime={anime}
-              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
-              onToggleFavorite={handleToggleFavorite}
-              onHide={handleHide}
-            />
-          ))
+          <div className={styles.animeGrid}>
+            {allTimeAnime
+              .filter(a => !hiddenAnimes.some(h => h.id === a.id))
+              .map(anime => (
+              <AnimeCard 
+                key={`alltime-${anime.id}`}
+                anime={anime}
+                isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
+                onToggleFavorite={handleToggleFavorite}
+                onHide={handleHide}
+              />
+            ))}
+          </div>
         )}
-      </Carousel>
+      </section>
 
       {/* Menú Contextual (Custom) */}
       {contextMenu.visible && (

@@ -1,6 +1,8 @@
 .carouselSection {
   margin-bottom: 3rem;
   width: 100%;
+  max-width: 100%;
+  /* Removed overflow: hidden to prevent arrows from being cut off */
 }
 
 .title {
@@ -15,18 +17,16 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-width: 0;
 }
 
 .scrollArea {
-  display: flex;
   flex: 1;
   min-width: 0;
+  display: flex;
   gap: 1.5rem;
   overflow-x: auto;
   scroll-behavior: smooth;
   padding: 1rem 0.5rem;
-  width: 100%;
   -webkit-overflow-scrolling: touch;
   /* Hide scrollbar */
   -ms-overflow-style: none;

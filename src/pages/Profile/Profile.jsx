@@ -9,21 +9,11 @@ import styles from './Profile.module.css';
 const Profile = () => {
   const navigate = useNavigate();
   const { user, updateProfile, signOut } = useAuth();
-  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [hiddenAnimes = [], setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
-  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [watchedAnimes = [], setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
+  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const [activeTab, setActiveTab] = useState('historial');
-
-  useEffect(() => {
-    const titles = {
-      historial: 'Perfil | Historial',
-      favoritos: 'Perfil | Favoritos',
-      ocultos: 'Perfil | Animes Ocultos',
-      cuenta: 'Perfil | Cuenta'
-    };
-    document.title = `${titles[activeTab] || 'Perfil'} | Anime`;
-  }, [activeTab]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -33,6 +23,16 @@ const Profile = () => {
   const handleRestore = (anime) => {
     setHiddenAnimes(hiddenAnimes.filter(a => a.id !== anime.id));
   };
+
+  React.useEffect(() => {
+    const titles = {
+      historial: 'Perfil | Historial',
+      favoritos: 'Perfil | Favoritos',
+      ocultos: 'Perfil | Animes Ocultos',
+      cuenta: 'Perfil | Cuenta'
+    };
+    document.title = `Lokatzo21 | ${titles[activeTab] || 'Perfil'}`;
+  }, [activeTab]);
 
   const handleToggleFavorite = (anime) => {
     setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== anime.id));

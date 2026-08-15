@@ -14,10 +14,10 @@ const Watch = () => {
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState('sub'); // 'sub', 'latino', 'castellano'
-  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [watchedEpisodes = [], setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
-  const [watchedAnimes = [], setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
-  const [videoProgress = {}, setVideoProgress] = useLocalStorage('videoProgress', {});
+  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
+  const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [videoProgress, setVideoProgress] = useLocalStorage('videoProgress', {});
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
   const [promptShownForEp, setPromptShownForEp] = useState(false);
@@ -32,14 +32,6 @@ const Watch = () => {
     setShowResumePrompt(false);
     lastSavedTime.current = 0;
   }, [episode]);
-
-  useEffect(() => {
-    if (animeInfo) {
-      document.title = `Viendo: ${animeInfo.title} | Episodio ${episode} | Anime`;
-    } else {
-      document.title = `Episodio ${episode} | Anime`;
-    }
-  }, [animeInfo, episode]);
 
   const handleVideoLoaded = () => {
     if (promptShownForEp) return; // Ya se le preguntó para este episodio
@@ -154,6 +146,14 @@ const Watch = () => {
     };
     fetchWatchData();
   }, [id, episode]);
+
+  React.useEffect(() => {
+    if (animeInfo) {
+      document.title = `Lokatzo21 | Viendo ${animeInfo.title} - Episodio ${episode}`;
+    } else {
+      document.title = `Lokatzo21 | Viendo Anime`;
+    }
+  }, [animeInfo, episode]);
 
   // Efecto separado para actualizar el reproductor cuando cambia el episodio
   useEffect(() => {
