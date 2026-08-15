@@ -56,9 +56,41 @@ class ScraperManager {
         args: [
           '--start-maximized', 
           '--disable-blink-features=AutomationControlled',
-          '--disable-infobars'
+          '--disable-infobars',
+          '--disable-notifications',
+          '--disable-popup-blocking' // lo desactivamos para manejarlo nosotros
         ]
       });
+
+      // Bloquear popups molestos globalmente y Spoof User-Agent
+      this.browser.on('targetcreated', async (target) => {
+        if (target.type() === 'page') {
+          try {
+             const page = await target.page();
+             
+             // Spoof User Agent para parecer humano y engañar a ZonaAPS / Cloudflare
+             await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36');
+             await page.setExtraHTTPHeaders({
+                 'Accept-Language': 'es-419,es;q=0.9,en;q=0.8',
+             });
+
+             const url = page.url();
+             if (url && url !== 'about:blank' && !url.includes('zonaaps') && !url.includes('animeonline')) {
+                await page.close();
+             }
+             // Si el popup carga después, lo atrapamos en 'framenavigated'
+             page.on('framenavigated', async (frame) => {
+                if (frame === page.mainFrame()) {
+                   const fUrl = frame.url();
+                   if (fUrl !== 'about:blank' && !fUrl.includes('zonaaps') && !fUrl.includes('animeonline')) {
+                       await page.close();
+                   }
+                }
+             });
+          } catch(e) {}
+        }
+      });
+
       global.logToUI('✅ Navegador iniciado correctamente', 'success');
     }
   }

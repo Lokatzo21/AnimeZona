@@ -10,6 +10,9 @@ class ZonaAPSProvider extends BaseProvider {
     this.log(`Iniciando módulo de ZonaAPS para: ${url}`, 'info');
     
     let targetPage = await this.browser.newPage();
+    targetPage.on('dialog', async dialog => {
+        try { await dialog.dismiss(); } catch(e) {}
+    });
     
     this.log('Navegando a la página de ZonaAPS...');
     try {
@@ -68,6 +71,9 @@ class ZonaAPSProvider extends BaseProvider {
 
   async scrapeSingle(episodeUrl, title, episodeNumber) {
       let targetPage = await this.browser.newPage();
+      targetPage.on('dialog', async dialog => {
+          try { await dialog.dismiss(); } catch(e) {}
+      });
       await this.scrapeSingleInner(targetPage, episodeUrl, title, episodeNumber);
   }
 
