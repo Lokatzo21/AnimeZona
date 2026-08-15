@@ -170,7 +170,25 @@ class ZonaAPSProvider extends BaseProvider {
         }, optIndex);
 
         this.log('Esperando a que cargue el reproductor...');
-        await this.delay(4000); 
+        await this.delay(2000); 
+
+        // TRUCO MAESTRO: Si la página detecta el bot, carga "embed-pro.php" que está vacío o bloqueado.
+        // Un usuario normal carga "zonaaps-player.xyz/embed3.php" con los mismos parámetros.
+        // Vamos a reescribir el iframe nosotros mismos para forzar el reproductor real.
+        await targetPage.evaluate(() => {
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+                if (iframe.src.includes('embed-pro.php') || iframe.src.includes('embed.php')) {
+                    let newSrc = iframe.src;
+                    newSrc = newSrc.replace('zonaaps.com/embed-pro.php', 'zonaaps-player.xyz/embed3.php');
+                    newSrc = newSrc.replace('zonaaps.com/embed.php', 'zonaaps-player.xyz/embed3.php');
+                    iframe.src = newSrc;
+                }
+            });
+        });
+
+        // Esperar a que el nuevo iframe cargue
+        await this.delay(3000);
 
         let videoUrl = null;
         let serverName = null;
