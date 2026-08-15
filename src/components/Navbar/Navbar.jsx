@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, User, PlayCircle, Menu, Heart, X } from 'lucide-react';
+import { Search, User, PlayCircle, Menu, Heart, X, Bot } from 'lucide-react';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useAuth } from '../../contexts/AuthContext';
+import ScraperModal from '../ScraperModal/ScraperModal';
 import styles from './Navbar.module.css';
 
 const Navbar = () => {
@@ -15,6 +16,7 @@ const Navbar = () => {
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isScraperOpen, setIsScraperOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -221,6 +223,14 @@ const Navbar = () => {
           </div>
           
           <div className={styles.authSection}>
+            <button 
+              className={styles.scraperBtn} 
+              onClick={() => setIsScraperOpen(true)}
+              title="Abrir Control Scraper"
+            >
+              <Bot size={20} />
+            </button>
+            
             {user ? (
               <div className={styles.userMenu}>
                 <Link to="/profile" className={styles.profileBtn} title={user?.user_metadata?.username || user.email}>
@@ -244,6 +254,7 @@ const Navbar = () => {
         </div>
       </div>
 
+      <ScraperModal isOpen={isScraperOpen} onClose={() => setIsScraperOpen(false)} />
     </nav>
   );
 };

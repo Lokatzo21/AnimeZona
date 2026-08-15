@@ -319,3 +319,6 @@
 .mobileSearchOnly {
   display: none;
 }
+
+.scraperBtn { background: transparent; border: none; color: #a0a0a0; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; margin-right: 10px; }
+.scraperBtn:hover { background: rgba(123, 44, 191, 0.2); color: #7b2cbf; }
