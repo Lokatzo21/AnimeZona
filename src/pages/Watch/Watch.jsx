@@ -17,6 +17,9 @@ const Watch = () => {
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
+  const [secretContinueWatching, setSecretContinueWatching] = useLocalStorage('secretContinueWatching', []);
+  const [secretWatchedAnimes, setSecretWatchedAnimes] = useLocalStorage('secretWatchedAnimes', []);
   const [videoProgress, setVideoProgress] = useLocalStorage('videoProgress', {});
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
@@ -194,8 +197,10 @@ const Watch = () => {
            setActiveServer(serversData[0]); // fallback
         }
 
-        // Guardar progreso en Continuar Viendo
-        setContinueWatching(prev => {
+        const isSecret = secretLikes.some(a => String(a.id) === String(animeInfo.id));
+        
+        // Guardar progreso en Continuar Viendo (Normal o Secreto)
+        const updateContinueWatching = prev => {
           const currentList = prev || [];
           const animeData = {
             id: animeInfo.id,
@@ -206,7 +211,13 @@ const Watch = () => {
           };
           const filtered = currentList.filter(item => String(item.id) !== String(animeInfo.id));
           return [animeData, ...filtered].slice(0, 20);
-        });
+        };
+        
+        if (isSecret) {
+          setSecretContinueWatching(updateContinueWatching);
+        } else {
+          setContinueWatching(updateContinueWatching);
+        }
 
         // Marcar como visto automáticamente
         setWatchedEpisodes(prev => {
@@ -216,8 +227,8 @@ const Watch = () => {
           return currentList;
         });
 
-        // Agregar a la lista general de "Animes Vistos" del perfil
-        setWatchedAnimes(prev => {
+        // Agregar a la lista general de "Animes Vistos" del perfil (Normal o Secreto)
+        const updateWatchedAnimes = prev => {
           const currentList = prev || [];
           if (!currentList.some(a => String(a.id) === String(animeInfo.id))) {
             return [{
@@ -228,7 +239,13 @@ const Watch = () => {
             }, ...currentList];
           }
           return currentList;
-        });
+        };
+
+        if (isSecret) {
+          setSecretWatchedAnimes(updateWatchedAnimes);
+        } else {
+          setWatchedAnimes(updateWatchedAnimes);
+        }
       }
     };
     fetchServers();

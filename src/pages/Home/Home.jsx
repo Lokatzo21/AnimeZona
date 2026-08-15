@@ -14,7 +14,7 @@ const Home = () => {
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
-  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, anime: null, section: null });
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -35,11 +35,7 @@ const Home = () => {
   }, []);
 
   // Ocultar menú contextual al hacer click en cualquier lado
-  useEffect(() => {
-    const handleClick = () => setContextMenu({ visible: false, x: 0, y: 0, anime: null, section: null });
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, []);
+  // Efecto eliminado
 
   const handleToggleFavorite = (anime) => {
     const isFav = favoriteAnimes.some(a => a.id === anime.id);
@@ -52,16 +48,6 @@ const Home = () => {
         image: anime.image,
       }, ...favoriteAnimes]);
     }
-  };
-
-  const handleContextMenu = (e, anime) => {
-    e.preventDefault();
-    setContextMenu({
-      visible: true,
-      x: e.pageX,
-      y: e.pageY,
-      anime: anime
-    });
   };
 
   const handleHide = (anime) => {
@@ -103,7 +89,6 @@ const Home = () => {
               anime={anime}
               isFavorite={true}
               onToggleFavorite={handleToggleFavorite}
-              onContextMenu={handleContextMenu}
             />
           ))}
         </Carousel>
@@ -152,26 +137,6 @@ const Home = () => {
       </section>
 
       {/* Menú Contextual (Custom) */}
-      {contextMenu.visible && (
-        <div 
-          className={`glass-panel ${styles.contextMenu}`}
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-        >
-          <ul>
-            <li 
-              className={styles.contextMenuItem}
-              onClick={() => {
-                const updated = favoriteAnimes.filter(a => a.id !== contextMenu.anime.id);
-                setFavoriteAnimes(updated);
-                setContextMenu({ ...contextMenu, visible: false });
-              }}
-            >
-              Quitar de favoritos
-            </li>
-          </ul>
-        </div>
-      )}
-
     </div>
   );
 };

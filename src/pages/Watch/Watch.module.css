@@ -435,12 +435,24 @@
 
   .langButtons, .serverButtons {
     width: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .langButtons::-webkit-scrollbar, .serverButtons::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
   }
 
   .langBtn, .serverBtn {
-    flex: 1;
+    flex: 0 0 auto;
     justify-content: center;
     font-size: 0.8rem;
-    padding: 0.5rem;
+    padding: 0.6rem 1rem;
+    white-space: nowrap;
   }
 }

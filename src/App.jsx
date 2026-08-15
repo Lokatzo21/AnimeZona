@@ -10,7 +10,6 @@ import './App.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { UIProvider } from './contexts/UIContext';
 import Login from './pages/Login/Login';
-import SecretZone from './pages/SecretZone/SecretZone';
 
 function App() {
   const location = useLocation();
@@ -28,7 +27,6 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/catalog" element={<Catalog />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/secret" element={<SecretZone />} />
           </Routes>
         </main>
       </UIProvider>
