@@ -11,9 +11,9 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   
   // Local storage para animes favoritos y ocultos
-  const [favoriteAnimes = [], setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
-  const [hiddenAnimes = [], setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
-  const [continueWatching = [], setContinueWatching] = useLocalStorage('continueWatching', []);
+  const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
+  const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
+  const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, anime: null, section: null });
 
   useEffect(() => {
@@ -42,15 +42,15 @@ const Home = () => {
   }, []);
 
   const handleToggleFavorite = (anime) => {
-    const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
+    const isFav = favoriteAnimes.some(a => a.id === anime.id);
     if (isFav) {
-      setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== anime.id));
+      setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== anime.id));
     } else {
       setFavoriteAnimes([{
         id: anime.id,
         title: anime.title,
         image: anime.image,
-      }, ...(favoriteAnimes || [])]);
+      }, ...favoriteAnimes]);
     }
   };
 
@@ -69,23 +69,23 @@ const Home = () => {
       id: anime.id,
       title: anime.title,
       image: anime.image
-    }, ...(hiddenAnimes || [])]);
+    }, ...hiddenAnimes]);
   };
 
   const handleRemoveContinue = (animeId) => {
-    setContinueWatching((continueWatching || []).filter(a => a.id !== animeId));
+    setContinueWatching(continueWatching.filter(a => a.id !== animeId));
   };
 
   return (
     <div className={styles.homeContainer}>
       {/* Continuar Viendo */}
-      {(continueWatching || []) && (continueWatching || []).length > 0 && (
+      {continueWatching && continueWatching.length > 0 && (
         <Carousel title="Continuar Viendo">
-          {(continueWatching || []).map(anime => (
+          {continueWatching.map(anime => (
             <AnimeCard 
               key={`continue-${anime.id}`}
               anime={anime}
-              isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
+              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
               onToggleFavorite={handleToggleFavorite}
               onHide={handleHide}
               onRemoveContinue={handleRemoveContinue}
@@ -95,9 +95,9 @@ const Home = () => {
       )}
 
       {/* Carrusel de Favoritos (Solo aparece si hay favoritos) */}
-      {(favoriteAnimes || []).length > 0 && (
+      {favoriteAnimes.length > 0 && (
         <Carousel title="Tus Animes Favoritos">
-          {(favoriteAnimes || []).map(anime => (
+          {favoriteAnimes.map(anime => (
             <AnimeCard 
               key={`fav-${anime.id}`}
               anime={anime}
@@ -114,13 +114,13 @@ const Home = () => {
         {loading ? (
           <p className={styles.loadingText}>Cargando recomendaciones...</p>
         ) : (
-          (topAnime || [])
-            .filter(a => !(hiddenAnimes || []).some(h => h.id === a.id))
+          topAnime
+            .filter(a => !hiddenAnimes.some(h => h.id === a.id))
             .slice(0, 10).map(anime => (
             <AnimeCard 
               key={`top-${anime.id}`}
               anime={anime}
-              isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
+              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
               onToggleFavorite={handleToggleFavorite}
               onHide={handleHide}
             />
@@ -129,18 +129,18 @@ const Home = () => {
       </Carousel>
 
 
-      {/* Animes Recomendados (De todos los animes existentes - Carousel) */}
+      {/* Animes Recomendados (De todos los animes existentes) */}
       <Carousel title="Animes Recomendados (Catálogo Global)">
         {loading ? (
           <p className={styles.loadingText}>Cargando catálogo...</p>
         ) : (
-          (allTimeAnime || [])
-            .filter(a => !(hiddenAnimes || []).some(h => h.id === a.id))
+          allTimeAnime
+            .filter(a => !hiddenAnimes.some(h => h.id === a.id))
             .map(anime => (
             <AnimeCard 
               key={`alltime-${anime.id}`}
               anime={anime}
-              isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
+              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
               onToggleFavorite={handleToggleFavorite}
               onHide={handleHide}
             />
@@ -158,7 +158,7 @@ const Home = () => {
             <li 
               className={styles.contextMenuItem}
               onClick={() => {
-                const updated = (favoriteAnimes || []).filter(a => a.id !== contextMenu.anime.id);
+                const updated = favoriteAnimes.filter(a => a.id !== contextMenu.anime.id);
                 setFavoriteAnimes(updated);
                 setContextMenu({ ...contextMenu, visible: false });
               }}
