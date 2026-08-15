@@ -106,8 +106,8 @@ const Watch = () => {
       setTimeout(() => {
         // En lugar de scrollIntoView que ignora el navbar fijo, calculamos la posición exacta
         // Restamos unos 80-100px para compensar la altura del navbar
-        const yOffset = -105; 
-        const element = videoContainerRef.current;
+        const yOffset = -90; 
+        const element = playerRef.current;
         const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
         window.scrollTo({ top: y, behavior: 'smooth' });
       }, 300);
