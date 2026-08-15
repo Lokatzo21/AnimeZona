@@ -65,9 +65,9 @@ const Home = () => {
   return (
     <div className={styles.homeContainer}>
       {/* Continuar Viendo */}
-      {continueWatching && continueWatching.length > 0 && (
+      {(continueWatching || []).length > 0 && (
         <Carousel title="Continuar Viendo">
-          {continueWatching.map(anime => (
+          {(continueWatching || []).map(anime => (
             <AnimeCard 
               key={`continue-${anime.id}`}
               anime={anime}
@@ -81,9 +81,9 @@ const Home = () => {
       )}
 
       {/* Carrusel de Favoritos (Solo aparece si hay favoritos) */}
-      {favoriteAnimes.length > 0 && (
+      {(favoriteAnimes || []).length > 0 && (
         <Carousel title="Tus Animes Favoritos">
-          {favoriteAnimes.map(anime => (
+          {(favoriteAnimes || []).map(anime => (
             <AnimeCard 
               key={`fav-${anime.id}`}
               anime={anime}
@@ -99,13 +99,13 @@ const Home = () => {
         {loading ? (
           <p className={styles.loadingText}>Cargando recomendaciones...</p>
         ) : (
-          topAnime
-            .filter(a => !hiddenAnimes.some(h => h.id === a.id))
+          (topAnime || [])
+            .filter(a => !(hiddenAnimes || []).some(h => h.id === a.id))
             .slice(0, 10).map(anime => (
             <AnimeCard 
               key={`top-${anime.id}`}
               anime={anime}
-              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
+              isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
               onToggleFavorite={handleToggleFavorite}
               onHide={handleHide}
             />
@@ -121,13 +121,13 @@ const Home = () => {
           <p className={styles.loadingText}>Cargando catálogo...</p>
         ) : (
           <div className={styles.animeGrid}>
-            {allTimeAnime
-              .filter(a => !hiddenAnimes.some(h => h.id === a.id))
+            {(allTimeAnime || [])
+              .filter(a => !(hiddenAnimes || []).some(h => h.id === a.id))
               .map(anime => (
               <AnimeCard 
                 key={`alltime-${anime.id}`}
                 anime={anime}
-                isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
+                isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
                 onToggleFavorite={handleToggleFavorite}
                 onHide={handleHide}
               />

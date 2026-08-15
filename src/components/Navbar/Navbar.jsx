@@ -49,7 +49,7 @@ const Navbar = () => {
         id: anime.id,
         title: anime.title,
         image: anime.image,
-      }, ...favoriteAnimes]);
+      }, ...(favoriteAnimes || [])]);
     }
   };
 
@@ -59,7 +59,7 @@ const Navbar = () => {
       id: anime.id,
       title: anime.title,
       image: anime.image
-    }, ...hiddenAnimes]);
+    }, ...(hiddenAnimes || [])]);
   };
 
   const handleSignOut = async () => {
@@ -79,7 +79,7 @@ const Navbar = () => {
     }
   };
 
-  const filteredResults = searchResults.filter(a => !hiddenAnimes.some(h => h.id === a.id));
+  const filteredResults = (searchResults || []).filter(a => !(hiddenAnimes || []).some(h => h.id === a.id));
 
   return (
     <nav className={`glass ${styles.navbar}`}>

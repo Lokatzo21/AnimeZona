@@ -25,7 +25,7 @@ const Profile = () => {
   const [editAvatar, setEditAvatar] = useState(user?.user_metadata?.avatar_url || DEFAULT_AVATAR.url);
 
   const handleRestore = (anime) => {
-    setHiddenAnimes(hiddenAnimes.filter(a => a.id !== anime.id));
+    setHiddenAnimes((hiddenAnimes || []).filter(a => a.id !== anime.id));
   };
 
   React.useEffect(() => {
@@ -40,12 +40,21 @@ const Profile = () => {
   }, [activeTab]);
 
   const handleToggleFavorite = (anime) => {
-    setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== anime.id));
+      const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
+      if (isFav) {
+        setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== anime.id));
+      } else {
+        setFavoriteAnimes([{
+          id: anime.id,
+          title: anime.title,
+          image: anime.image,
+        }, ...(favoriteAnimes || [])]);
+      }
   };
 
   const handleRemoveContinue = (animeId) => {
-    setContinueWatching(continueWatching.filter(a => a.id !== animeId));
-    setSecretContinueWatching(secretContinueWatching.filter(a => a.id !== animeId));
+    setContinueWatching((continueWatching || []).filter(a => a.id !== animeId));
+    setSecretContinueWatching((secretContinueWatching || []).filter(a => a.id !== animeId));
   };
 
   const handleSaveProfile = async () => {
@@ -157,11 +166,11 @@ const Profile = () => {
         {activeTab === 'historial' && (
           <div>
             <h2 className={styles.sectionTitle}>Último capítulo visto</h2>
-            {continueWatching.length === 0 ? (
+            {(continueWatching || []).length === 0 ? (
               <p className={styles.emptyMsg}>No tienes episodios pendientes. ¡Ve a ver un anime!</p>
             ) : (
               <div className={styles.grid}>
-                {continueWatching.map(anime => (
+                {(continueWatching || []).map(anime => (
                   <AnimeCard 
                     key={`history-${anime.id}`} 
                     anime={anime} 
@@ -172,11 +181,11 @@ const Profile = () => {
             )}
 
             <h2 className={styles.sectionTitle} style={{ marginTop: '3rem' }}>Animes Vistos</h2>
-            {watchedAnimes.length === 0 ? (
+            {(watchedAnimes || []).length === 0 ? (
               <p className={styles.emptyMsg}>Aún no has marcado ningún anime completo como visto.</p>
             ) : (
               <div className={styles.grid}>
-                {watchedAnimes.map(anime => (
+                {(watchedAnimes || []).map(anime => (
                   <AnimeCard 
                     key={`watched-${anime.id}`} 
                     anime={anime} 
@@ -191,11 +200,11 @@ const Profile = () => {
         {activeTab === 'favoritos' && (
           <div>
             <h2 className={styles.sectionTitle}>Mis Favoritos</h2>
-            {favoriteAnimes.length === 0 ? (
+            {(favoriteAnimes || []).length === 0 ? (
               <p className={styles.emptyMsg}>No tienes ningún anime en favoritos.</p>
             ) : (
               <div className={styles.grid}>
-                {favoriteAnimes.map(anime => (
+                {(favoriteAnimes || []).map(anime => (
                   <AnimeCard 
                     key={`fav-${anime.id}`} 
                     anime={anime}
@@ -216,11 +225,11 @@ const Profile = () => {
             <p style={{ color: '#a0a0a0', marginBottom: '20px' }}>
               Estos animes ya no aparecerán en tu página de Inicio ni en las búsquedas. Pasa el ratón sobre uno y haz clic en "Restaurar Anime" para deshacerlo.
             </p>
-            {hiddenAnimes.length === 0 ? (
+            {(hiddenAnimes || []).length === 0 ? (
               <p className={styles.emptyMsg}>No tienes ningún anime oculto.</p>
             ) : (
               <div className={styles.grid}>
-                {hiddenAnimes.map(anime => (
+                {(hiddenAnimes || []).map(anime => (
                   <AnimeCard 
                     key={`hidden-${anime.id}`} 
                     anime={anime} 
@@ -276,11 +285,11 @@ const Profile = () => {
         {activeTab === 'secreto' && isSecretUnlocked && (
           <div className={styles.secretoSection}>
             <h2 className={styles.sectionTitle} style={{ color: '#a855f7' }}>Continuar Viendo (Secreto)</h2>
-            {secretContinueWatching.length === 0 ? (
+            {(secretContinueWatching || []).length === 0 ? (
               <p className={styles.emptyMsg}>No tienes episodios pendientes en modo secreto.</p>
             ) : (
               <div className={styles.grid}>
-                {secretContinueWatching.map(anime => (
+                {(secretContinueWatching || []).map(anime => (
                   <AnimeCard 
                     key={`secrethistory-${anime.id}`} 
                     anime={anime} 
@@ -291,11 +300,11 @@ const Profile = () => {
             )}
 
             <h2 className={styles.sectionTitle} style={{ marginTop: '3rem', color: '#a855f7' }}>Animes Vistos (Secreto)</h2>
-            {secretWatchedAnimes.length === 0 ? (
+            {(secretWatchedAnimes || []).length === 0 ? (
               <p className={styles.emptyMsg}>Aún no has marcado ningún anime secreto como visto.</p>
             ) : (
               <div className={styles.grid}>
-                {secretWatchedAnimes.map(anime => (
+                {(secretWatchedAnimes || []).map(anime => (
                   <AnimeCard 
                     key={`secretwatched-${anime.id}`} 
                     anime={anime} 
@@ -306,11 +315,11 @@ const Profile = () => {
             )}
 
             <h2 className={styles.sectionTitle} style={{ marginTop: '3rem', color: '#a855f7' }}>Me Gusta (Secretos)</h2>
-            {secretLikes.length === 0 ? (
+            {(secretLikes || []).length === 0 ? (
               <p className={styles.emptyMsg}>No tienes animes favoritos en secreto.</p>
             ) : (
               <div className={styles.grid}>
-                {secretLikes.map(anime => (
+                {(secretLikes || []).map(anime => (
                   <AnimeCard 
                     key={`secretlike-${anime.id}`} 
                     anime={anime}
