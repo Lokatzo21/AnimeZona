@@ -438,7 +438,7 @@ const Admin = () => {
                       type="text" 
                       className={styles.input} 
                       placeholder={`T1E${i + 1} - ...`} 
-                      value={episodeNames[i + 1] || ''}
+                      value={episodeNames[i + 1] !== undefined ? episodeNames[i + 1] : `T1E${i + 1} - `}
                       onChange={(e) => handleEpisodeNameChange(i + 1, e.target.value)}
                     />
                   </div>
