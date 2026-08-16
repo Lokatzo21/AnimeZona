@@ -85,10 +85,10 @@ const Admin = () => {
   const loadUsersData = async () => {
     setLoadingUsers(true);
     try {
-      const usersData = await api.getUsers();
-      const adminsData = await api.getAdmins();
-      setUsers(usersData);
-      setAdmins(adminsData.map(a => a.email));
+      const usersList = await api.getUsers();
+      const adminsList = await api.getAdmins();
+      setUsers(usersList);
+      setAdmins(adminsList.map(a => a.email));
     } catch (e) {
       console.error(e);
     } finally {
@@ -108,6 +108,10 @@ const Admin = () => {
   };
 
   const handleToggleAdmin = async (email, makeAdmin) => {
+    if (email === 'manuelminuttimoreno21@gmail.com' && !makeAdmin) {
+      alert('No puedes quitar el rol de admin al usuario principal.');
+      return;
+    }
     await api.toggleAdmin(email, makeAdmin);
     loadUsersData();
   };
@@ -143,6 +147,7 @@ const Admin = () => {
     try {
       const payload = {
         ...animeForm,
+        total_episodes: parseInt(animeForm.total_episodes, 10),
         episode_names: episodeNames
       };
       
@@ -261,52 +266,93 @@ const Admin = () => {
 
       {activeTab === 'usuarios' && (
         <div>
-          <h2>Usuarios Registrados ({users.length})</h2>
+          <h2>Gestión de Administradores y Usuarios</h2>
+          
+          <div style={{ marginBottom: '2rem', padding: '1rem', background: '#1f2937', borderRadius: '0.5rem' }}>
+            <h3 style={{ marginTop: 0 }}>Añadir nuevo Administrador</h3>
+            <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Ingresa un correo para darle permisos de admin (incluso si no se ha registrado aún).</p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const email = formData.get('newAdminEmail');
+              if (email) {
+                handleToggleAdmin(email, true);
+                e.target.reset();
+              }
+            }} style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <input type="email" name="newAdminEmail" className={styles.input} placeholder="correo@ejemplo.com" required style={{ flex: 1 }} />
+              <button type="submit" className={styles.submitBtn} style={{ width: 'auto', padding: '0 1.5rem' }}>Conceder Admin</button>
+            </form>
+          </div>
+
+          <h2>Usuarios en el Sistema</h2>
           {loadingUsers ? <p>Cargando...</p> : (
             <div className={styles.tableContainer}>
               <table className={styles.table}>
                 <thead>
                   <tr>
                     <th>Email</th>
-                    <th>Fecha de Registro</th>
+                    <th>Estado de Registro</th>
                     <th>Rol</th>
                     <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => {
-                    const isAdmin = admins.includes(u.email);
-                    return (
-                      <tr key={u.id}>
-                        <td>{u.email}</td>
-                        <td>{new Date(u.created_at).toLocaleDateString()}</td>
-                        <td>
-                          {isAdmin ? (
-                            <span className={`${styles.badge} ${styles.badgeAdmin}`}>ADMIN</span>
-                          ) : (
-                            <span className={`${styles.badge} ${styles.badgeUser}`}>USER</span>
-                          )}
-                        </td>
-                        <td>
-                          {isAdmin ? (
-                            <button 
-                              className={`${styles.actionBtn} ${styles.btnRemoveAdmin}`}
-                              onClick={() => handleToggleAdmin(u.email, false)}
-                            >
-                              Quitar Admin
-                            </button>
-                          ) : (
-                            <button 
-                              className={`${styles.actionBtn} ${styles.btnMakeAdmin}`}
-                              onClick={() => handleToggleAdmin(u.email, true)}
-                            >
-                              Hacer Admin
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {(() => {
+                    const allEmails = new Set([...users.map(u => u.email), ...admins]);
+                    const displayUsers = Array.from(allEmails).map(email => {
+                      const userRecord = users.find(u => u.email === email);
+                      return {
+                        id: userRecord ? userRecord.id : email,
+                        email,
+                        registered: !!userRecord,
+                        created_at: userRecord ? userRecord.created_at : null
+                      };
+                    });
+
+                    return displayUsers.map(u => {
+                      const isAdmin = admins.includes(u.email);
+                      const isMainAdmin = u.email === 'manuelminuttimoreno21@gmail.com';
+                      return (
+                        <tr key={u.id}>
+                          <td>{u.email}</td>
+                          <td>
+                            {u.registered ? (
+                              <span style={{ color: '#10b981' }}>Registrado ({new Date(u.created_at).toLocaleDateString()})</span>
+                            ) : (
+                              <span style={{ color: '#f59e0b' }}>No Registrado</span>
+                            )}
+                          </td>
+                          <td>
+                            {isAdmin ? (
+                              <span className={`${styles.badge} ${styles.badgeAdmin}`}>{isMainAdmin ? 'MAIN ADMIN' : 'ADMIN'}</span>
+                            ) : (
+                              <span className={`${styles.badge} ${styles.badgeUser}`}>USER</span>
+                            )}
+                          </td>
+                          <td>
+                            {isAdmin ? (
+                              !isMainAdmin && (
+                                <button 
+                                  className={`${styles.actionBtn} ${styles.btnRemoveAdmin}`}
+                                  onClick={() => handleToggleAdmin(u.email, false)}
+                                >
+                                  Quitar Admin
+                                </button>
+                              )
+                            ) : (
+                              <button 
+                                className={`${styles.actionBtn} ${styles.btnMakeAdmin}`}
+                                onClick={() => handleToggleAdmin(u.email, true)}
+                              >
+                                Hacer Admin
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
