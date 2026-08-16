@@ -16,6 +16,9 @@ const Admin = () => {
   const [admins, setAdmins] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // Custom Animes Tab State
+  const [customAnimes, setCustomAnimes] = useState([]);
+
   // Add Anime Form State
   const [animeForm, setAnimeForm] = useState({
     title: '',
@@ -31,17 +34,36 @@ const Admin = () => {
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
-    // Si estamos en localhost, autoverificar
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       setIsVerified(true);
     }
   }, []);
 
   useEffect(() => {
-    if (isVerified && activeTab === 'usuarios') {
-      loadUsersData();
+    if (isVerified) {
+      if (activeTab === 'usuarios') {
+        loadUsersData();
+      } else if (activeTab === 'lista_animes') {
+        loadCustomAnimes();
+      }
     }
   }, [isVerified, activeTab]);
+
+  const loadCustomAnimes = async () => {
+    try {
+      const data = await api.getCustomAnimes(true);
+      setCustomAnimes(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteAnime = async (id) => {
+    if (window.confirm('¿Seguro que quieres eliminar este anime?')) {
+      await api.deleteCustomAnime(id);
+      loadCustomAnimes();
+    }
+  };
 
   const loadUsersData = async () => {
     setLoadingUsers(true);
@@ -182,6 +204,12 @@ const Admin = () => {
         >
           <PlusCircle size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }}/>
           Añadir Anime Custom
+        </button>
+        <button 
+          className={`${styles.tabBtn} ${activeTab === 'lista_animes' ? styles.active : ''}`}
+          onClick={() => setActiveTab('lista_animes')}
+        >
+          Ver Animes Añadidos
         </button>
       </div>
 
@@ -327,6 +355,57 @@ const Admin = () => {
               {isSubmitting ? 'Guardando...' : 'Añadir Anime'}
             </button>
           </form>
+        </div>
+      )}
+
+      {activeTab === 'lista_animes' && (
+        <div>
+          <h2>Animes Personalizados Añadidos ({customAnimes.length})</h2>
+          {customAnimes.length === 0 ? (
+            <p className={styles.emptyMsg}>Aún no has añadido ningún anime personalizado.</p>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Portada</th>
+                    <th>Título</th>
+                    <th>Episodios</th>
+                    <th>Estado</th>
+                    <th>Secreto</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customAnimes.map(anime => (
+                    <tr key={anime.id}>
+                      <td>
+                        <img src={anime.image} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                      </td>
+                      <td>{anime.title}</td>
+                      <td>{anime.totalEpisodes}</td>
+                      <td>{anime.status}</td>
+                      <td>
+                        {anime.isSecret ? (
+                          <span className={`${styles.badge} ${styles.badgeRemoveAdmin}`} style={{ background: '#ef4444', color: 'white' }}>Sí</span>
+                        ) : (
+                          <span className={`${styles.badge} ${styles.badgeUser}`}>No</span>
+                        )}
+                      </td>
+                      <td>
+                        <button 
+                          className={`${styles.actionBtn} ${styles.btnRemoveAdmin}`}
+                          onClick={() => handleDeleteAnime(anime.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

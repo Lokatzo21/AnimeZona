@@ -195,8 +195,14 @@ export const api = {
   searchAnime: async (query) => {
     try {
       if (!query) return [];
-      const customAnimes = await api.getCustomAnimes(true); // Permitir buscar secretos aquí, se filtrarán en UI si no es admin, o los dejamos porque solo busca por query exacto
-      const matchedCustom = customAnimes.filter(ca => ca.title.toLowerCase().includes(query.toLowerCase()) && !ca.isSecret);
+      const customAnimes = await api.getCustomAnimes(true);
+      const queryWords = query.toLowerCase().split(' ').filter(w => w.length > 0);
+      
+      const matchedCustom = customAnimes.filter(ca => {
+        if (ca.isSecret) return false;
+        const titleLower = ca.title.toLowerCase();
+        return queryWords.every(word => titleLower.includes(word));
+      });
 
       const url = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(query)}`;
       const data = await fetchWithDelay(url);
