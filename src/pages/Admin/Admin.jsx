@@ -325,7 +325,10 @@ const Admin = () => {
                           </td>
                           <td>
                             {isAdmin ? (
-                              <span className={`${styles.badge} ${styles.badgeAdmin}`}>{isMainAdmin ? 'MAIN ADMIN' : 'ADMIN'}</span>
+                              <span className={`${styles.badge} ${styles.badgeAdmin}`} style={isMainAdmin ? { background: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '4px' } : {}}>
+                                {isMainAdmin && <ShieldAlert size={14} />}
+                                {isMainAdmin ? 'MAIN ADMIN' : 'ADMIN'}
+                              </span>
                             ) : (
                               <span className={`${styles.badge} ${styles.badgeUser}`}>USER</span>
                             )}
