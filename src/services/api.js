@@ -94,10 +94,29 @@ export const api = {
     }
   },
   addCustomAnime: async (animeData) => {
-    const id = `custom-${Date.now()}`;
-    await supabase.from('custom_animes').insert([{ ...animeData, id }]);
-    return id;
+    try {
+      const id = `custom-${Date.now()}`;
+      const payload = { ...animeData, id };
+      const { data, error } = await supabase.from('custom_animes').insert([payload]).select();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding custom anime:', error);
+      throw error;
+    }
   },
+
+  updateCustomAnime: async (id, animeData) => {
+    try {
+      const { data, error } = await supabase.from('custom_animes').update(animeData).eq('id', id).select();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating custom anime:', error);
+      throw error;
+    }
+  },
+
   deleteCustomAnime: async (id) => {
      await supabase.from('custom_animes').delete().eq('id', id);
   },

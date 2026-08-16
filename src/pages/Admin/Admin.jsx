@@ -29,6 +29,7 @@ const Admin = () => {
     is_secret: false,
     genres: []
   });
+  const [editingAnimeId, setEditingAnimeId] = useState(null);
   const [episodeNames, setEpisodeNames] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -56,6 +57,22 @@ const Admin = () => {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleEditAnime = (anime) => {
+    setEditingAnimeId(anime.id);
+    setAnimeForm({
+      title: anime.title || '',
+      image: anime.image || '',
+      description: anime.description || '',
+      total_episodes: anime.total_episodes || 12,
+      status: anime.status || 'En emisión',
+      is_secret: anime.is_secret || false,
+      genres: anime.genres || []
+    });
+    setEpisodeNames(anime.episode_names || {});
+    setActiveTab('animes');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteAnime = async (id) => {
@@ -119,27 +136,56 @@ const Admin = () => {
     }));
   };
 
-  const handleAddAnime = async (e) => {
+  const handleAddCustomAnime = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSuccessMsg('');
     try {
-      const dataToSave = {
+      const payload = {
         ...animeForm,
         episode_names: episodeNames
       };
-      await api.addCustomAnime(dataToSave);
-      setSuccessMsg('¡Anime añadido correctamente al catálogo!');
+      
+      if (editingAnimeId) {
+        await api.updateCustomAnime(editingAnimeId, payload);
+        setSuccessMsg('¡Anime actualizado correctamente!');
+      } else {
+        await api.addCustomAnime(payload);
+        setSuccessMsg('¡Anime añadido correctamente al catálogo!');
+      }
+
       setAnimeForm({
-        title: '', image: '', description: '', total_episodes: 12, status: 'En emisión', is_secret: false, genres: []
+        title: '',
+        image: '',
+        description: '',
+        total_episodes: 12,
+        status: 'En emisión',
+        is_secret: false,
+        genres: []
       });
       setEpisodeNames({});
+      setEditingAnimeId(null);
+      
       setTimeout(() => setSuccessMsg(''), 5000);
-    } catch (err) {
-      console.error(err);
-      alert('Error al guardar el anime');
+    } catch (e) {
+      alert('Error al guardar el anime.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAnimeId(null);
+    setAnimeForm({
+      title: '',
+      image: '',
+      description: '',
+      total_episodes: 12,
+      status: 'En emisión',
+      is_secret: false,
+      genres: []
+    });
+    setEpisodeNames({});
   };
 
   if (!isVerified) {
@@ -279,7 +325,7 @@ const Admin = () => {
             </div>
           )}
 
-          <form onSubmit={handleAddAnime}>
+          <form onSubmit={handleAddCustomAnime}>
             <div className={styles.formGroup}>
               <label>Título del Anime</label>
               <input type="text" name="title" className={styles.input} value={animeForm.title} onChange={handleAnimeChange} required placeholder="Ej: Link Click (Donghua)" />
@@ -351,9 +397,16 @@ const Admin = () => {
               </div>
             </div>
 
-            <button type="submit" className={styles.submitBtn} disabled={isSubmitting} style={{ marginTop: '2rem' }}>
-              {isSubmitting ? 'Guardando...' : 'Añadir Anime'}
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+              <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
+                {isSubmitting ? 'Guardando...' : (editingAnimeId ? 'Actualizar Anime' : 'Añadir Anime')}
+              </button>
+              {editingAnimeId && (
+                <button type="button" className={styles.submitBtn} style={{ background: '#6b7280' }} onClick={handleCancelEdit}>
+                  Cancelar Edición
+                </button>
+              )}
+            </div>
           </form>
         </div>
       )}
@@ -393,12 +446,21 @@ const Admin = () => {
                         )}
                       </td>
                       <td>
-                        <button 
-                          className={`${styles.actionBtn} ${styles.btnRemoveAdmin}`}
-                          onClick={() => handleDeleteAnime(anime.id)}
-                        >
-                          Eliminar
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button 
+                            className={`${styles.actionBtn}`}
+                            style={{ background: '#3b82f6', color: 'white' }}
+                            onClick={() => handleEditAnime(anime)}
+                          >
+                            Editar
+                          </button>
+                          <button 
+                            className={`${styles.actionBtn} ${styles.btnRemoveAdmin}`}
+                            onClick={() => handleDeleteAnime(anime.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
