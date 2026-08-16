@@ -50,7 +50,8 @@ const mapCustomAnime = (item) => ({
   status: item.status || 'En emisión',
   trailer: null,
   isCustom: true,
-  isSecret: item.is_secret || false
+  is_secret: item.is_secret || false,
+  episode_names: item.episode_names || {}
 });
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
