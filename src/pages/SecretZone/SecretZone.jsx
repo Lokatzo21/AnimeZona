@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import AnimeCard from '../../components/AnimeCard/AnimeCard';
+import { api } from '../../services/api';
 import styles from './SecretZone.module.css';
 import { ArrowLeft, Lock } from 'lucide-react';
 
@@ -11,14 +12,23 @@ const SecretZone = () => {
   const [secretWatchedAnimes, setSecretWatchedAnimes] = useLocalStorage('secretWatchedAnimes', []);
   const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
   const [activeTab, setActiveTab] = useState('historial');
+  const [secretCatalog, setSecretCatalog] = useState([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (activeTab === 'historial') {
       document.title = "Historial Secreto | AnimeZona";
     } else if (activeTab === 'favoritos') {
       document.title = "Favoritos Secretos | AnimeZona";
+    } else if (activeTab === 'catalogo') {
+      document.title = "Catálogo Secreto | AnimeZona";
+      loadSecretCatalog();
     }
   }, [activeTab]);
+
+  const loadSecretCatalog = async () => {
+    const data = await api.getCustomAnimes(true);
+    setSecretCatalog(data.filter(a => a.isSecret));
+  };
 
   const handleRemoveContinue = (animeId) => {
     setSecretContinueWatching((secretContinueWatching || []).filter(a => a.id !== animeId));
@@ -55,6 +65,12 @@ const SecretZone = () => {
           onClick={() => setActiveTab('favoritos')}
         >
           Favoritos Secretos
+        </button>
+        <button 
+          className={`${styles.tabBtn} ${activeTab === 'catalogo' ? styles.active : ''}`}
+          onClick={() => setActiveTab('catalogo')}
+        >
+          Catálogo Secreto
         </button>
       </div>
 
@@ -107,6 +123,25 @@ const SecretZone = () => {
                     key={`secretlike-${anime.id}`} 
                     anime={anime}
                     isFavorite={true}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'catalogo' && (
+          <div>
+            <h2 className={styles.sectionTitle}>Catálogo Secreto (Custom)</h2>
+            {secretCatalog.length === 0 ? (
+              <p className={styles.emptyMsg}>No hay animes secretos en la base de datos.</p>
+            ) : (
+              <div className={styles.grid}>
+                {secretCatalog.map(anime => (
+                  <AnimeCard 
+                    key={`secretcatalog-${anime.id}`} 
+                    anime={anime}
+                    isFavorite={(secretLikes || []).some(a => a.id === anime.id)}
                   />
                 ))}
               </div>

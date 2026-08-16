@@ -4,7 +4,6 @@ import { Search, User, PlayCircle, Menu, Heart, X, Bot } from 'lucide-react';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useAuth } from '../../contexts/AuthContext';
-import ScraperModal from '../ScraperModal/ScraperModal';
 import styles from './Navbar.module.css';
 
 const Navbar = () => {
@@ -16,7 +15,6 @@ const Navbar = () => {
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isScraperOpen, setIsScraperOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -67,13 +65,28 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = async (e) => {
     if (e.key === 'Enter') {
-      if (searchQuery.trim().toLowerCase() === 'secreto') {
+      const q = searchQuery.trim().toLowerCase();
+      if (q === 'secreto') {
         navigate('/secret');
         setSearchQuery('');
         setSearchResults([]);
         setIsMobileMenuOpen(false);
+      } else if (q === 'admin') {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        let isUserAdmin = false;
+        
+        if (user && user.email) {
+          isUserAdmin = await api.isAdmin(user.email);
+        }
+        
+        if (isLocal || isUserAdmin) {
+          navigate('/admin');
+          setSearchQuery('');
+          setSearchResults([]);
+          setIsMobileMenuOpen(false);
+        }
       }
     }
   };
@@ -223,14 +236,6 @@ const Navbar = () => {
           </div>
           
           <div className={styles.authSection}>
-            <button 
-              className={styles.scraperBtn} 
-              onClick={() => setIsScraperOpen(true)}
-              title="Abrir Control Scraper"
-            >
-              <Bot size={20} />
-            </button>
-            
             {user ? (
               <div className={styles.userMenu}>
                 <Link to="/profile" className={styles.profileBtn} title={user?.user_metadata?.username || user.email}>
@@ -254,7 +259,6 @@ const Navbar = () => {
         </div>
       </div>
 
-      <ScraperModal isOpen={isScraperOpen} onClose={() => setIsScraperOpen(false)} />
     </nav>
   );
 };

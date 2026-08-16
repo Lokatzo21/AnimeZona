@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-const TMDB_GENRES = {
+export const TMDB_GENRES = {
   'Animación': 16,
   'Action & Adventure': 10759,
   'Sci-Fi & Fantasy': 10765,
@@ -17,7 +17,7 @@ const TMDB_GENRES_REVERSE = Object.entries(TMDB_GENRES).reduce((acc, [key, val])
   return acc;
 }, {});
 
-// Función auxiliar para mapear el formato de TMDB al formato que espera nuestra UI (como el de Jikan)
+// Map TMDB data
 const mapAnimeData = (item) => ({
   id: item.id,
   title: item.name || item.original_name,
@@ -32,16 +32,34 @@ const mapAnimeData = (item) => ({
     : (item.genre_ids ? item.genre_ids.map(id => TMDB_GENRES_REVERSE[id]).filter(Boolean) : []),
   status: item.status === 'Ended' ? 'Finalizado' : item.status === 'Returning Series' ? 'En emisión' : item.status,
   trailer: item.videos?.results?.length > 0 ? `https://www.youtube.com/embed/${item.videos.results[0].key}` : null,
+  isCustom: false,
+  isSecret: false
 });
 
-// Implementación de retraso para no saturar la API (aunque TMDB soporta 50 req/s, es buena práctica)
+// Map Custom Anime data
+const mapCustomAnime = (item) => ({
+  id: item.id,
+  title: item.title,
+  image: item.image || 'https://via.placeholder.com/225x318?text=No+Image',
+  score: item.score || 'N/A',
+  totalEpisodes: item.total_episodes || null,
+  episodes: item.total_episodes || null,
+  type: 'TV',
+  description: item.description || 'Sin sinopsis disponible.',
+  genres: item.genres || [],
+  status: item.status || 'En emisión',
+  trailer: null,
+  isCustom: true,
+  isSecret: item.is_secret || false
+});
+
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 let lastRequestTime = 0;
 
 const fetchWithDelay = async (url) => {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
-  if (timeSinceLastRequest < 100) { // 100ms delay for TMDB
+  if (timeSinceLastRequest < 100) { 
     await delay(100 - timeSinceLastRequest);
   }
   lastRequestTime = Date.now();
@@ -54,58 +72,102 @@ const fetchWithDelay = async (url) => {
 };
 
 export const api = {
+  // ADMIN & CUSTOM API
+  getUsers: async () => {
+    const { data } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
+    return data || [];
+  },
+  getAdmins: async () => {
+    const { data } = await supabase.from('admins').select('*');
+    return data || [];
+  },
+  isAdmin: async (email) => {
+    if (!email) return false;
+    const { data } = await supabase.from('admins').select('*').eq('email', email);
+    return data && data.length > 0;
+  },
+  toggleAdmin: async (email, makeAdmin) => {
+    if (makeAdmin) {
+      await supabase.from('admins').insert([{ email }]);
+    } else {
+      await supabase.from('admins').delete().eq('email', email);
+    }
+  },
+  addCustomAnime: async (animeData) => {
+    const id = `custom-${Date.now()}`;
+    await supabase.from('custom_animes').insert([{ ...animeData, id }]);
+    return id;
+  },
+  deleteCustomAnime: async (id) => {
+     await supabase.from('custom_animes').delete().eq('id', id);
+  },
+  getCustomAnimes: async (includeSecret = false) => {
+     let query = supabase.from('custom_animes').select('*').order('created_at', { ascending: false });
+     if (!includeSecret) {
+        query = query.eq('is_secret', false);
+     }
+     const { data } = await query;
+     return data ? data.map(mapCustomAnime) : [];
+  },
+
   // Inicio - Populares (Trending)
   getTrendingAnime: async () => {
     try {
+      const customAnimes = await api.getCustomAnimes(false);
       const url1 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=1`;
       const url2 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=2`;
-      const [res1, res2] = await Promise.all([
-        fetchWithDelay(url1),
-        fetchWithDelay(url2)
-      ]);
-      const combined = [...(res1?.results || []), ...(res2?.results || [])];
-      return combined.map(mapAnimeData);
+      const [res1, res2] = await Promise.all([ fetchWithDelay(url1), fetchWithDelay(url2) ]);
+      const combined = [...(res1?.results || []), ...(res2?.results || [])].map(mapAnimeData);
+      return [...customAnimes, ...combined];
     } catch (error) {
       console.error('Error fetching trending anime:', error);
       return [];
     }
   },
 
-  // Inicio - Top Anime (Mejor valorados)
+  // Inicio - Top Anime
   getTopAnime: async () => {
     try {
+      const customAnimes = await api.getCustomAnimes(false);
       const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=500&page=1`;
       const data = await fetchWithDelay(url);
-      return data.results.map(mapAnimeData);
+      return [...customAnimes.slice(0, 5), ...data.results.map(mapAnimeData)];
     } catch (error) {
       console.error('Error fetching top anime:', error);
       return [];
     }
   },
 
-  // Inicio - Recientes (En emisión)
+  // Inicio - Recientes
   getRecentAnime: async () => {
     try {
+      const customAnimes = await api.getCustomAnimes(false);
       const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=first_air_date.desc&page=1`;
       const data = await fetchWithDelay(url);
-      return data.results.map(mapAnimeData);
+      return [...customAnimes, ...data.results.map(mapAnimeData)];
     } catch (error) {
       console.error('Error fetching recent anime:', error);
       return [];
     }
   },
 
-  // Descubrir (Para el Catálogo con Paginación y Filtros)
+  // Descubrir (Para el Catálogo)
   getDiscoverAnime: async (page = 1, genreName = 'Todos') => {
     try {
+      let customAnimes = [];
+      if (page === 1) {
+        customAnimes = await api.getCustomAnimes(false);
+        if (genreName !== 'Todos') {
+          customAnimes = customAnimes.filter(ca => ca.genres.includes(genreName));
+        }
+      }
+
       let url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=${page}`;
-      
       if (genreName !== 'Todos' && TMDB_GENRES[genreName]) {
         url += `&with_genres=${TMDB_GENRES[genreName]}`;
       }
-
       const data = await fetchWithDelay(url);
-      return data.results.map(mapAnimeData);
+      return [...customAnimes, ...data.results.map(mapAnimeData)];
     } catch (error) {
       console.error('Error fetching discover anime:', error);
       return [];
@@ -115,6 +177,11 @@ export const api = {
   // Detalles del Anime
   getAnimeInfo: async (id) => {
     try {
+      if (String(id).startsWith('custom-')) {
+         const { data } = await supabase.from('custom_animes').select('*').eq('id', id).single();
+         return data ? mapCustomAnime(data) : null;
+      }
+
       const url = `${BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&language=es-MX&append_to_response=videos`;
       const data = await fetchWithDelay(url);
       return mapAnimeData(data);
@@ -128,20 +195,36 @@ export const api = {
   searchAnime: async (query) => {
     try {
       if (!query) return [];
+      const customAnimes = await api.getCustomAnimes(true); // Permitir buscar secretos aquí, se filtrarán en UI si no es admin, o los dejamos porque solo busca por query exacto
+      const matchedCustom = customAnimes.filter(ca => ca.title.toLowerCase().includes(query.toLowerCase()) && !ca.isSecret);
+
       const url = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(query)}`;
       const data = await fetchWithDelay(url);
-      // Filtrar para asegurar que solo devuelva contenido en japonés (anime)
       const animes = data.results.filter(item => item.original_language === 'ja');
-      return animes.map(mapAnimeData);
+      return [...matchedCustom, ...animes.map(mapAnimeData)];
     } catch (error) {
       console.error('Error searching anime:', error);
       return [];
     }
   },
 
-  // Episodios - Extrae los episodios de la temporada 1 (o la temporada principal)
+  // Episodios
   getAnimeEpisodes: async (id) => {
     try {
+      if (String(id).startsWith('custom-')) {
+         const { data } = await supabase.from('custom_animes').select('*').eq('id', id).single();
+         if (!data) return [];
+         const total = data.total_episodes || 12;
+         const names = data.episode_names || {};
+         return Array.from({ length: total }, (_, i) => ({
+           id: i + 1,
+           tmdb_episode_id: i + 1,
+           title: names[i + 1] || `T1E${i + 1}`,
+           url: i + 1,
+           season: 1
+         }));
+      }
+
       const info = await api.getAnimeInfo(id);
       if (!info) return [];
       
@@ -149,7 +232,6 @@ export const api = {
       let allEpisodes = [];
       let absoluteEpCount = 1;
 
-      // Iterar por todas las temporadas (excluyendo la 0 que suele ser especiales)
       for (let s = 1; s <= numSeasons; s++) {
         const seasonUrl = `${BASE_URL}/tv/${id}/season/${s}?api_key=${TMDB_API_KEY}&language=es-MX`;
         try {
@@ -157,13 +239,13 @@ export const api = {
           if (seasonData.episodes && seasonData.episodes.length > 0) {
             const today = new Date().toISOString().split('T')[0];
             const seasonEps = seasonData.episodes
-              .filter(ep => !ep.air_date || ep.air_date <= today) // Evitar episodios futuros
+              .filter(ep => !ep.air_date || ep.air_date <= today)
               .map(ep => ({
                 id: ep.episode_number,
                 title: `T${s}E${ep.episode_number} - ${ep.name}`,
                 url: ep.episode_number,
                 season: s,
-                absolute_id: absoluteEpCount++ // Para mantener un id único en la UI
+                absolute_id: absoluteEpCount++ 
               }));
             allEpisodes = [...allEpisodes, ...seasonEps];
           }
@@ -172,13 +254,12 @@ export const api = {
         }
       }
       
-      // Consultar Supabase para ver cuántos episodios tenemos realmente
       let dbMaxEpisode = 0;
       try {
         const { data } = await supabase
           .from('anime_episodes')
           .select('episode_number')
-          .ilike('search_title', info.title) // ilike no distingue mayúsculas/minúsculas
+          .ilike('search_title', info.title)
           .order('episode_number', { ascending: false })
           .limit(1);
           
@@ -196,7 +277,6 @@ export const api = {
         }));
       }
 
-      // Si tenemos más episodios en la BD de los que TMDB reporta, los rellenamos
       if (finalEpisodes.length < dbMaxEpisode) {
           const startingId = finalEpisodes.length + 1;
           for (let i = startingId; i <= dbMaxEpisode; i++) {
@@ -210,11 +290,8 @@ export const api = {
           }
       }
 
-      if (finalEpisodes.length > 0) {
-         return finalEpisodes;
-      }
+      if (finalEpisodes.length > 0) return finalEpisodes;
       
-      // Fallback si no hay detalles de episodios pero sabemos el total
       const total = info.number_of_episodes || 12;
       return Array.from({ length: total }, (_, i) => ({
         id: i + 1,
@@ -229,10 +306,7 @@ export const api = {
     }
   },
 
-  // Reproductor - Ahora extrae múltiples servidores e idiomas
   getEpisodeServers: async (animeTitle, episodeId, language = 'sub', animeId = null, seasonNumber = 1) => {
-    
-    // Asegurarnos de tener el animeId de TMDB
     if (!animeId) {
        const searchUrl = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(animeTitle)}`;
        try {
@@ -241,10 +315,9 @@ export const api = {
        } catch(e) {}
     }
 
-    if (animeId) {
+    if (animeId || String(animeId).startsWith('custom-')) {
       let servers = [];
       try {
-        // Extraer todos los servidores disponibles para este episodio (sin .limit(1))
         const { data, error } = await supabase
           .from('anime_episodes')
           .select('*')
@@ -264,7 +337,6 @@ export const api = {
             lang: lat.language
           }));
           
-          // Eliminar duplicados exactos de URL por si acaso
           servers = servers.filter((server, index, self) =>
             index === self.findIndex((t) => t.url === server.url)
           );
@@ -282,10 +354,8 @@ export const api = {
       } catch (e) {
         console.error("No se pudo obtener el servidor de Supabase", e);
       }
-
       return servers;
     } else {
-       // Fallback a YouTube si falla la obtención del TMDB ID
        const query = encodeURIComponent(`${animeTitle} episodio ${episodeId} ${language}`);
        return [{
          name: 'YOUTUBE FALLBACK',
