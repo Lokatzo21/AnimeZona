@@ -431,6 +431,14 @@ const Watch = () => {
                         </div>
                       )}
                     </>
+                  ) : activeServer?.name?.includes('(Descarga)') ? (
+                    <div className={styles.downloadContainer} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#1e293b', color: 'white'}}>
+                        <h3 style={{fontSize: '1.5rem', marginBottom: '1rem'}}>Enlace de Descarga</h3>
+                        <p style={{marginBottom: '1.5rem', color: '#94a3b8'}}>Este servidor es para descargar el episodio, no para reproducirlo aquí.</p>
+                        <a href={activeServer.url} target="_blank" rel="noopener noreferrer" style={{background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold'}}>
+                            Ir a Descargar
+                        </a>
+                    </div>
                   ) : (
                     <iframe 
                       src={activeServer.url} 
