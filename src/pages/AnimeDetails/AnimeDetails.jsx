@@ -4,23 +4,41 @@ import { Play, Eye, Heart, Check } from 'lucide-react';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useUI } from '../../contexts/UIContext';
+import { useAuth } from '../../contexts/AuthContext';
 import styles from './AnimeDetails.module.css';
 
 const AnimeDetails = () => {
   const { id } = useParams();
   const [animeInfo, setAnimeInfo] = useState(null);
   const [episodes, setEpisodes] = useState([]);
+  const [activeSeason, setActiveSeason] = useState(1);
   const [loading, setLoading] = useState(true);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [scrapingStatus, setScrapingStatus] = useState(null);
   const navigate = useNavigate();
   const { showToast, showConfirm } = useUI();
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (user?.email) {
+      api.isAdmin(user.email).then(setIsAdmin);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [user]);
   
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
+
+  const fetchScrapingStatus = async (tmdbId) => {
+    const status = await api.getScrapingStatus(tmdbId);
+    setScrapingStatus(status);
+  };
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -33,6 +51,19 @@ const AnimeDetails = () => {
       setAnimeInfo(info);
       setEpisodes(eps);
       setLoading(false);
+      
+      if (eps && eps.length > 0) {
+        const seasons = [...new Set(eps.map(ep => ep.season || ep.season_number || 1))].sort((a, b) => a - b);
+        if (seasons.length > 0) {
+          setActiveSeason(seasons[0]);
+        }
+      }
+      
+      if (info) {
+        fetchScrapingStatus(info.id);
+        const interval = setInterval(() => fetchScrapingStatus(info.id), 5000); // Check every 5s
+        return () => clearInterval(interval);
+      }
     };
     fetchInfo();
   }, [id]);
@@ -188,6 +219,37 @@ const AnimeDetails = () => {
               <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
               {isFavorite ? 'En Favoritos' : 'Añadir a Favoritos'}
             </button>
+            
+            {/* Scraping Button/Status (Only Admin) */}
+            {isAdmin && (
+              !scrapingStatus || scrapingStatus.status === 'error' ? (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => navigate('/admin', { state: { scraperTitle: animeInfo.title, scraperTmdb: animeInfo.id } })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', 
+                      backgroundColor: '#3b82f6', color: 'white', borderRadius: '0.5rem', 
+                      border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: '0.875rem'
+                    }}
+                  >
+                    {scrapingStatus?.status === 'error' ? 'Reintentar Scrapeo' : 'Scrapear'}
+                  </button>
+                  {scrapingStatus?.status === 'error' && (
+                    <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>Falló último intento</span>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', 
+                  backgroundColor: scrapingStatus.status === 'processing' ? '#eab308' : '#22c55e', 
+                  color: 'white', borderRadius: '0.5rem', fontWeight: 500, fontSize: '0.875rem'
+                }}>
+                  {scrapingStatus.status === 'pending' && 'En Cola de Extracción'}
+                  {scrapingStatus.status === 'processing' && 'Extrayendo Episodios...'}
+                  {scrapingStatus.status === 'completed' && 'Episodios Extraídos'}
+                </div>
+              )
+            )}
           </div>
 
           <div className={styles.tags}>
@@ -210,7 +272,7 @@ const AnimeDetails = () => {
 
       {/* Lista de Episodios */}
       <div className={styles.episodesSection}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Episodios ({episodes.length})</h2>
           
           {/* Botón para limpiar vistos */}
@@ -227,20 +289,58 @@ const AnimeDetails = () => {
             </button>
           )}
         </div>
+
+        {/* Season Tabs */}
+        {(() => {
+          const seasons = [...new Set(episodes.map(ep => ep.season || ep.season_number || 1))].sort((a, b) => a - b);
+          if (seasons.length > 1) {
+            return (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {seasons.map(season => (
+                  <button
+                    key={season}
+                    onClick={() => setActiveSeason(season)}
+                    style={{
+                      padding: '0.5rem 1.5rem',
+                      borderRadius: '8px',
+                      background: activeSeason === season ? 'var(--primary-color)' : 'rgba(30, 41, 59, 0.5)',
+                      color: 'white',
+                      fontWeight: activeSeason === season ? 'bold' : 'normal',
+                      border: '1px solid',
+                      borderColor: activeSeason === season ? 'var(--primary-color)' : 'rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Temporada {season}
+                  </button>
+                ))}
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         <div className={styles.episodesGrid}>
-          {episodes.map(ep => {
+          {episodes
+            .filter(ep => (ep.season || ep.season_number || 1) === activeSeason)
+            .map((ep, index) => {
             const globalEpId = `${animeInfo.id}-${ep.id}`;
             const isEpWatched = watchedEpisodes.includes(globalEpId);
+            
+            let cleanTitle = ep.title || '';
+            cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
+            const displayTitle = `T${activeSeason}E${index + 1} - ${cleanTitle}`;
             
             return (
               <Link 
                 to={`/watch/${animeInfo.id}/${ep.id}`} 
                 key={ep.id}
                 className={`glass-panel ${styles.episodeCard} ${isEpWatched ? styles.episodeWatched : ''}`}
-                title={ep.title}
+                title={displayTitle}
               >
                 <div className={styles.epInfo}>
-                  <div className={styles.epNumber}>{ep.title}</div>
+                  <div className={styles.epNumber}>{displayTitle}</div>
                   {isEpWatched && (
                     <span className={styles.watchedText}>
                       <Check size={14} />

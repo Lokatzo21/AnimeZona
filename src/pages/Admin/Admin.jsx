@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldAlert, Users, PlusCircle, CheckCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, ShieldAlert, Users, PlusCircle, CheckCircle, Database, ListVideo, Film, ChevronRight } from 'lucide-react';
 import { api, TMDB_GENRES } from '../../services/api';
+import { supabase } from '../../services/supabase';
 import styles from './Admin.module.css';
 
 const Admin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isVerified, setIsVerified] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('usuarios');
+
+  // Scraped Animes Tab State
+  const [scrapedAnimesData, setScrapedAnimesData] = useState([]);
+  const [scrapedStats, setScrapedStats] = useState({ animes: 0, episodes: 0, servers: 0 });
+  const [globalServerStats, setGlobalServerStats] = useState([]);
+  const [showServerStatsModal, setShowServerStatsModal] = useState(false);
+  const [loadingScraped, setLoadingScraped] = useState(false);
+  const [selectedScrapedAnime, setSelectedScrapedAnime] = useState(null);
 
   // Users Tab State
   const [users, setUsers] = useState([]);
@@ -34,6 +45,24 @@ const Admin = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Scraper V3 State
+  const [scraperForm, setScraperForm] = useState({ title: '', alt_title: '', tmdb_id: '', provider: 'both', startEpisode: 1 });
+  const [scrapingJobs, setScrapingJobs] = useState([]);
+  const [isScraperSubmitting, setIsScraperSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.scraperTitle) {
+      setActiveTab('scraper');
+      setScraperForm(prev => ({
+        ...prev,
+        title: location.state.scraperTitle,
+        tmdb_id: location.state.scraperTmdb ? String(location.state.scraperTmdb) : ''
+      }));
+      // Limpiar state para no atorarnos en un loop o comportamiento raro si navegamos de nuevo
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   useEffect(() => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       setIsVerified(true);
@@ -41,14 +70,64 @@ const Admin = () => {
   }, []);
 
   useEffect(() => {
-    if (isVerified) {
-      if (activeTab === 'usuarios') {
-        loadUsersData();
-      } else if (activeTab === 'lista_animes') {
-        loadCustomAnimes();
-      }
+    if (!isVerified) return;
+
+    if (activeTab === 'usuarios') {
+      loadUsersData();
+    } else if (activeTab === 'lista_animes') {
+      loadCustomAnimes();
+    } else if (activeTab === 'scraper') {
+      fetchScrapingJobs();
+      const interval = setInterval(fetchScrapingJobs, 3000);
+      return () => clearInterval(interval);
+    } else if (activeTab === 'scraped_animes') {
+      loadScrapedAnimes();
     }
   }, [isVerified, activeTab]);
+
+  const fetchScrapingJobs = async () => {
+    const { data, error } = await supabase
+      .from('scraping_queue')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (!error && data) {
+      setScrapingJobs(data);
+    }
+  };
+
+  const handleAddScrapingJob = async (e) => {
+    e.preventDefault();
+    setIsScraperSubmitting(true);
+    try {
+      let finalTitle = `${scraperForm.title.trim()}||${scraperForm.provider}||${scraperForm.startEpisode}`;
+      if (scraperForm.alt_title && scraperForm.alt_title.trim() !== '') {
+         finalTitle += `||${scraperForm.alt_title.trim()}`;
+      }
+      
+      const { error } = await supabase.from('scraping_queue').insert([{
+        title: finalTitle,
+        anime_tmdb_id: scraperForm.tmdb_id.trim() || null,
+        status: 'pending',
+        logs: []
+      }]);
+      if (error) throw error;
+      setSuccessMsg('Anime añadido a la cola de extracción correctamente.');
+      setScraperForm({ title: '', alt_title: '', tmdb_id: '', provider: 'both', startEpisode: 1 });
+      fetchScrapingJobs();
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Error al añadir a la cola.');
+    } finally {
+      setIsScraperSubmitting(false);
+    }
+  };
+
+  const handleScraperChange = (e) => {
+    const { name, value } = e.target;
+    setScraperForm(prev => ({ ...prev, [name]: value }));
+  };
 
   const loadCustomAnimes = async () => {
     try {
@@ -93,6 +172,143 @@ const Admin = () => {
       console.error(e);
     } finally {
       setLoadingUsers(false);
+    }
+  };
+
+  const loadScrapedAnimes = async () => {
+    setLoadingScraped(true);
+    try {
+      // 1. Fetch custom_animes to match titles for images
+      const { data: customData } = await supabase.from('custom_animes').select('id, title, image');
+      
+      // Fetch anime_episodes with pagination to bypass 1000 row limit
+      let allData = [];
+      let fetchMore = true;
+      let from = 0;
+      const step = 1000;
+
+      while (fetchMore) {
+        const { data, error } = await supabase
+          .from('anime_episodes')
+          .select('anime_tmdb_id, search_title, episode_number, season_number, server_name, language')
+          .range(from, from + step - 1);
+
+        if (error) {
+          console.error(error);
+          break;
+        }
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          from += step;
+          if (data.length < step) fetchMore = false;
+        } else {
+          fetchMore = false;
+        }
+      }
+      
+      if (allData.length > 0) {
+        const data = allData;
+        const animesMap = {};
+        let totalEpisodesCount = 0;
+        let totalServers = data.length;
+        const serverCounts = {};
+
+        data.forEach(ep => {
+          // Track global server counts
+          if (ep.server_name) {
+            const sName = ep.server_name.toUpperCase();
+            serverCounts[sName] = (serverCounts[sName] || 0) + 1;
+          }
+
+          const key = ep.search_title?.toLowerCase().trim();
+          if (!key) return;
+          if (!animesMap[key]) {
+            animesMap[key] = {
+              id: key,
+              tmdb_id: ep.anime_tmdb_id,
+              title: ep.search_title || 'Desconocido',
+              episodesMap: {},
+              totalServers: 0,
+              poster: null
+            };
+
+            // If it has no tmdb_id, try to find it in custom_animes by title
+            if (!ep.anime_tmdb_id && ep.search_title && customData) {
+               const foundCustom = customData.find(c => c.title.toLowerCase().trim() === ep.search_title.toLowerCase().trim());
+               if (foundCustom && foundCustom.image) {
+                  animesMap[key].poster = foundCustom.image;
+               }
+            }
+          } else {
+             // Keep the TMDB ID if one of the rows has it
+             if (!animesMap[key].tmdb_id && ep.anime_tmdb_id) {
+                 animesMap[key].tmdb_id = ep.anime_tmdb_id;
+             }
+          }
+          
+          if (!animesMap[key].episodesMap[ep.episode_number]) {
+            animesMap[key].episodesMap[ep.episode_number] = {
+              episode_number: ep.episode_number,
+              season_number: ep.season_number || 1,
+              servers: []
+            };
+            totalEpisodesCount++;
+          }
+          
+          const srvLang = ep.language || 'sub';
+          const srvName = ep.server_name || 'Desconocido';
+          const isDuplicate = animesMap[key].episodesMap[ep.episode_number].servers.some(s => s.name.toUpperCase() === srvName.toUpperCase() && s.lang.toLowerCase() === srvLang.toLowerCase());
+          
+          if (!isDuplicate) {
+            animesMap[key].episodesMap[ep.episode_number].servers.push({
+              name: srvName,
+              lang: srvLang
+            });
+            animesMap[key].totalServers++;
+          }
+        });
+        
+        // Sort server counts descending
+        const sortedServerStats = Object.keys(serverCounts).map(s => ({
+          server: s,
+          count: serverCounts[s]
+        })).sort((a, b) => b.count - a.count);
+        setGlobalServerStats(sortedServerStats);
+
+        const animesList = Object.values(animesMap).sort((a,b) => a.title.localeCompare(b.title));
+        
+        setScrapedStats({
+          animes: animesList.length,
+          episodes: totalEpisodesCount,
+          servers: totalServers
+        });
+        
+        setScrapedAnimesData(animesList);
+        
+        // Fetch posters for animes asynchronously
+        animesList.forEach(async (anime) => {
+          if (!anime.poster) {
+            try {
+              if (anime.tmdb_id) {
+                const info = await api.getAnimeInfo(anime.tmdb_id);
+                if (info?.image) {
+                  setScrapedAnimesData(prev => prev.map(a => a.id === anime.id ? { ...a, poster: info.image } : a));
+                }
+              } else {
+                const results = await api.searchAnime(anime.title);
+                if (results && results.length > 0 && results[0].image) {
+                  setScrapedAnimesData(prev => prev.map(a => a.id === anime.id ? { ...a, poster: results[0].image } : a));
+                }
+              }
+            } catch(e) {}
+          }
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingScraped(false);
     }
   };
 
@@ -244,25 +460,116 @@ const Admin = () => {
       <div className={styles.tabs}>
         <button 
           className={`${styles.tabBtn} ${activeTab === 'usuarios' ? styles.active : ''}`}
-          onClick={() => setActiveTab('usuarios')}
+          onClick={() => { setActiveTab('usuarios'); setSelectedScrapedAnime(null); }}
         >
           <Users size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }}/>
           Usuarios
         </button>
         <button 
           className={`${styles.tabBtn} ${activeTab === 'animes' ? styles.active : ''}`}
-          onClick={() => setActiveTab('animes')}
+          onClick={() => { setActiveTab('animes'); setSelectedScrapedAnime(null); }}
         >
           <PlusCircle size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }}/>
           Añadir Anime Custom
         </button>
         <button 
           className={`${styles.tabBtn} ${activeTab === 'lista_animes' ? styles.active : ''}`}
-          onClick={() => setActiveTab('lista_animes')}
+          onClick={() => { setActiveTab('lista_animes'); setSelectedScrapedAnime(null); }}
         >
-          Ver Animes Añadidos
+          Lista de Animes
+        </button>
+        <button 
+          className={`${styles.tabBtn} ${activeTab === 'scraper' ? styles.active : ''}`}
+          onClick={() => { setActiveTab('scraper'); setSelectedScrapedAnime(null); }}
+        >
+          Scraper V3 (Bot)
+        </button>
+        <button 
+          className={`${styles.tabBtn} ${activeTab === 'scraped_animes' ? styles.active : ''}`}
+          onClick={() => setActiveTab('scraped_animes')}
+        >
+          <Database size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }}/>
+          Animes Scrapeados
         </button>
       </div>
+
+      {activeTab === 'scraper' && (
+        <div>
+          <h2>Cerebro Scraper V3</h2>
+          <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>Añade animes a la cola para que el bot los busque y extraiga de forma automática en segundo plano.</p>
+          
+          <form onSubmit={handleAddScrapingJob} style={{ background: '#1f2937', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className={styles.formGroup}>
+                <label>Título a Guardar (Exacto)</label>
+                <input type="text" name="title" className={styles.input} value={scraperForm.title} onChange={handleScraperChange} required placeholder="Ej: Frieren" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Búsqueda Alternativa (Opcional)</label>
+                <input type="text" name="alt_title" className={styles.input} value={scraperForm.alt_title || ''} onChange={handleScraperChange} placeholder="Ej: Sousou no Frieren" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>TMDB ID (Opcional)</label>
+                <input type="text" name="tmdb_id" className={styles.input} value={scraperForm.tmdb_id} onChange={handleScraperChange} placeholder="Ej: 37551" />
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr auto', gap: '1rem', alignItems: 'end' }}>
+              <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                <label>Ep. Inicial</label>
+                <input type="number" name="startEpisode" min="1" className={styles.input} value={scraperForm.startEpisode} onChange={handleScraperChange} required />
+              </div>
+              <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                <label>Proveedor (Fuente de Extracción)</label>
+                <select name="provider" className={styles.input} value={scraperForm.provider} onChange={handleScraperChange}>
+                  <option value="both">Ambos (Recomendado - Más servidores)</option>
+                  <option value="cinebel">Solo Cinebel (VIP)</option>
+                  <option value="animeonline">Solo AnimeOnline Ninja (Estándar)</option>
+                </select>
+              </div>
+              <button type="submit" className={styles.submitBtn} disabled={isScraperSubmitting} style={{ width: 'auto', marginBottom: '2px' }}>
+                {isScraperSubmitting ? 'Encolando...' : 'Añadir a la Cola'}
+              </button>
+            </div>
+          </form>
+
+          <h3>Trabajos en Cola ({scrapingJobs.length})</h3>
+          <div className={styles.tableContainer}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Título</th>
+                  <th>Estado</th>
+                  <th>Último Log</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scrapingJobs.map(job => (
+                  <tr key={job.id}>
+                    <td style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{job.id.substring(0, 8)}...</td>
+                    <td style={{ fontWeight: 'bold', color: 'white' }}>{job.title.split('||')[0]}</td>
+                    <td>
+                      <span style={{
+                        padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold',
+                        background: job.status === 'completed' ? '#059669' : job.status === 'error' ? '#ef4444' : job.status === 'processing' ? '#3b82f6' : '#4b5563',
+                        color: 'white'
+                      }}>
+                        {job.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '0.85rem', color: '#9ca3af', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {job.logs && job.logs.length > 0 ? job.logs[job.logs.length - 1].message : 'Esperando turno...'}
+                    </td>
+                    <td style={{ fontSize: '0.85rem' }}>{new Date(job.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'usuarios' && (
         <div>
@@ -515,6 +822,188 @@ const Admin = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'scraped_animes' && (
+        <div style={{ marginTop: '2rem' }}>
+          {selectedScrapedAnime ? (
+            <div>
+              <button 
+                onClick={() => setSelectedScrapedAnime(null)} 
+                style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', fontSize: '1rem' }}
+              >
+                <ArrowLeft size={18} /> Volver a Animes Scrapeados
+              </button>
+              <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
+                <img 
+                  src={selectedScrapedAnime.poster || 'https://via.placeholder.com/225x318?text=No+Image'} 
+                  alt={selectedScrapedAnime.title}
+                  style={{ width: '200px', borderRadius: '1rem', objectFit: 'cover' }}
+                />
+                <div>
+                  <h2 style={{ fontSize: '2rem', marginBottom: '1rem', textTransform: 'capitalize' }}>{selectedScrapedAnime.title}</h2>
+                  <p style={{ color: '#9ca3af', marginBottom: '0.5rem' }}>TMDB ID: {selectedScrapedAnime.tmdb_id || 'N/A'}</p>
+                  <p style={{ color: '#9ca3af', marginBottom: '0.5rem' }}>Total Servidores extraídos: <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>{selectedScrapedAnime.totalServers}</span></p>
+                  <p style={{ color: '#9ca3af', marginBottom: '0.5rem' }}>Total Episodios distintos: <span style={{ color: '#10b981', fontWeight: 'bold' }}>{Object.keys(selectedScrapedAnime.episodesMap).length}</span></p>
+                </div>
+              </div>
+
+              <h3>Episodios por Temporada</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                {Object.values(selectedScrapedAnime.episodesMap)
+                  .sort((a,b) => a.episode_number - b.episode_number)
+                  .map(ep => {
+                    const latServers = ep.servers.filter(s => s.lang.toLowerCase().startsWith('lat'));
+                    const subServers = ep.servers.filter(s => s.lang.toLowerCase().startsWith('sub'));
+                    return (
+                  <div key={ep.episode_number} style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem' }}>Temporada {ep.season_number} - Episodio {ep.episode_number}</h4>
+                      
+                      {subServers.length > 0 && (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <span style={{ color: '#9ca3af', fontSize: '0.85rem', marginRight: '0.5rem' }}>SUB ({subServers.length}):</span>
+                          <div style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {subServers.map((srv, idx) => (
+                              <span key={idx} style={{ background: '#3b82f6', padding: '0.2rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.8rem', fontWeight: 'bold', color: 'white' }}>
+                                {srv.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {latServers.length > 0 && (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <span style={{ color: '#9ca3af', fontSize: '0.85rem', marginRight: '0.5rem' }}>LAT ({latServers.length}):</span>
+                          <div style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {latServers.map((srv, idx) => (
+                              <span key={idx} style={{ background: '#10b981', padding: '0.2rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.8rem', fontWeight: 'bold', color: 'white' }}>
+                                {srv.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(ep.servers.length - subServers.length - latServers.length) > 0 && (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <span style={{ color: '#9ca3af', fontSize: '0.85rem', marginRight: '0.5rem' }}>OTROS:</span>
+                          <div style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {ep.servers.filter(s => !s.lang.toLowerCase().startsWith('lat') && !s.lang.toLowerCase().startsWith('sub')).map((srv, idx) => (
+                              <span key={idx} style={{ background: '#6b7280', padding: '0.2rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.8rem', fontWeight: 'bold', color: 'white' }}>
+                                {srv.name} ({srv.lang})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.9rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <strong>{ep.servers.length}</strong> total
+                    </div>
+                  </div>
+                )})}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2>Animes Scrapeados en Base de Datos</h2>
+                {loadingScraped && <span style={{ color: '#3b82f6' }}>Cargando...</span>}
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
+                  <h3 style={{ fontSize: '2.5rem', color: '#3b82f6', margin: 0 }}>{scrapedStats.animes}</h3>
+                  <p style={{ color: '#9ca3af', margin: 0 }}>Animes Distintos</p>
+                </div>
+                <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
+                  <h3 style={{ fontSize: '2.5rem', color: '#10b981', margin: 0 }}>{scrapedStats.episodes}</h3>
+                  <p style={{ color: '#9ca3af', margin: 0 }}>Total Episodios</p>
+                </div>
+                <div 
+                  onClick={() => setShowServerStatsModal(true)}
+                  style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid #8b5cf6', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center', cursor: 'pointer', transition: 'background 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)'}
+                >
+                  <h3 style={{ fontSize: '2.5rem', color: '#8b5cf6', margin: 0 }}>{scrapedStats.servers}</h3>
+                  <p style={{ color: '#9ca3af', margin: 0 }}>Total Servidores de Video</p>
+                  <p style={{ fontSize: '0.8rem', color: '#8b5cf6', marginTop: '0.5rem' }}>Clic para ver detalles</p>
+                </div>
+              </div>
+
+              {showServerStatsModal && createPortal(
+                <div style={{
+                  position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(0,0,0,0.8)', zIndex: 9999,
+                  display: 'flex', justifyContent: 'center', alignItems: 'center'
+                }}>
+                  <div style={{
+                    background: '#1f2937', padding: '2rem', borderRadius: '1rem',
+                    width: '90%', maxWidth: '500px', maxHeight: '80vh', display: 'flex', flexDirection: 'column'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexShrink: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: '1.5rem' }}>Estadísticas de Servidores</h3>
+                      <button onClick={() => setShowServerStatsModal(false)} style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+                    </div>
+                    
+                    <div style={{ overflowY: 'auto', flex: 1, paddingRight: '1rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: '#1f2937', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                          <tr style={{ borderBottom: '1px solid #374151', textAlign: 'left' }}>
+                            <th style={{ padding: '0.75rem', color: '#9ca3af' }}>Servidor</th>
+                            <th style={{ padding: '0.75rem', color: '#9ca3af' }}>Total Enlaces</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {globalServerStats.map((stat, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #374151' }}>
+                              <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>{stat.server}</td>
+                              <td style={{ padding: '0.75rem', color: '#10b981' }}>{stat.count}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td style={{ padding: '0.75rem', fontWeight: 'bold', fontSize: '1.1rem' }}>TOTAL GENERAL</td>
+                            <td style={{ padding: '0.75rem', fontWeight: 'bold', fontSize: '1.1rem', color: '#3b82f6' }}>{scrapedStats.servers}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1.5rem' }}>
+                {scrapedAnimesData.map(anime => (
+                  <div 
+                    key={anime.id} 
+                    onClick={() => setSelectedScrapedAnime(anime)}
+                    style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'scale(1.05)' } }}
+                  >
+                    <img 
+                      src={anime.poster || 'https://via.placeholder.com/225x318?text=Cargando...'} 
+                      alt={anime.title}
+                      style={{ width: '100%', height: '260px', objectFit: 'cover' }}
+                    />
+                    <div style={{ padding: '1rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textTransform: 'capitalize' }} title={anime.title}>
+                        {anime.title}
+                      </h4>
+                      <p style={{ margin: 0, marginTop: '0.5rem', fontSize: '0.875rem', color: '#9ca3af' }}>
+                        {Object.keys(anime.episodesMap).length} Episodios
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

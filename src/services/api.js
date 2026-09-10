@@ -281,39 +281,108 @@ export const api = {
       }
       
       let dbMaxEpisode = 0;
+      let dbEps = [];
       try {
         const { data } = await supabase
           .from('anime_episodes')
-          .select('episode_number')
-          .ilike('search_title', info.title)
-          .order('episode_number', { ascending: false })
-          .limit(1);
+          .select('episode_number, season_number, episode_name')
+          .eq('anime_tmdb_id', String(info.id))
+          .order('episode_number', { ascending: false });
           
         if (data && data.length > 0) {
+           dbEps = data;
            dbMaxEpisode = data[0].episode_number;
         }
       } catch (e) { console.error("Error al consultar Supabase episodios", e); }
 
       let finalEpisodes = allEpisodes;
       if (allEpisodes.length > 0) {
-        finalEpisodes = allEpisodes.map(ep => ({
-          ...ep,
-          tmdb_episode_id: ep.id,
-          id: ep.absolute_id 
-        }));
+        finalEpisodes = allEpisodes.map((ep, index) => {
+          // Intentar obtener el nombre y temporada desde TMDB local o la base de datos
+          const dbEpInfo = (dbEps && dbEps.find(e => e.episode_number === (index + 1))) || {};
+          
+          return {
+            ...ep,
+            title: dbEpInfo.episode_name || ep.title || `Episodio ${index + 1}`,
+            season: dbEpInfo.season_number || ep.season || 1,
+            tmdb_episode_id: ep.id,
+            id: ep.absolute_id 
+          };
+        });
       }
 
       if (finalEpisodes.length < dbMaxEpisode) {
           const startingId = finalEpisodes.length + 1;
           for (let i = startingId; i <= dbMaxEpisode; i++) {
+              const dbEpInfo = (dbEps && dbEps.find(e => e.episode_number === i)) || {};
               finalEpisodes.push({
                   id: i,
                   tmdb_episode_id: i,
-                  title: `Episodio ${i} (Extra)`,
+                  title: dbEpInfo.episode_name || `Episodio ${i} (Extra)`,
                   url: i,
-                  season: 1
+                  season: dbEpInfo.season_number || 1
               });
           }
+      }
+
+      // Parche específico para Frieren (ID 209867) debido al desfase del Especial en sitios de Anime vs TMDB
+      if (String(info.id) === '209867') {
+         const newFrierenEps = [];
+         
+         // Episodios 1 a 28 (Temporada 1 real)
+         for (let i = 0; i < 28; i++) {
+             if (finalEpisodes[i]) {
+                 finalEpisodes[i].season = 1;
+                 newFrierenEps.push(finalEpisodes[i]);
+             }
+         }
+         
+         // Episodio 29 (Especial - Temporada 1)
+         const dbEp29 = (dbEps && dbEps.find(e => e.episode_number === 29)) || {};
+         newFrierenEps.push({
+             id: 29,
+             tmdb_episode_id: 29,
+             title: dbEp29.episode_name || 'Marumaru no Mahou - Extra',
+             url: 29,
+             season: 1
+         });
+         
+         // Episodios 30+ (Temporada 2, mapeados a los episodios 29+ de TMDB)
+         // TMDB devuelve 38 episodios, por lo que el índice 28 es el Ep 29 de TMDB.
+         for (let i = 28; i < allEpisodes.length; i++) {
+             const ep = allEpisodes[i]; 
+             const newAbsoluteNum = ep.url + 1; // Desfasar por 1
+             const dbEpInfo = (dbEps && dbEps.find(e => e.episode_number === newAbsoluteNum)) || {};
+             
+             let epName = ep.title;
+             if (epName.includes(' - ')) {
+                 epName = epName.split(' - ').slice(1).join(' - ');
+             }
+             
+             newFrierenEps.push({
+                 id: newAbsoluteNum,
+                 tmdb_episode_id: ep.id,
+                 title: dbEpInfo.episode_name || `T2E${newAbsoluteNum - 29} - ${epName}`,
+                 url: newAbsoluteNum,
+                 season: dbEpInfo.season_number || 2
+             });
+         }
+         
+         // Agregar episodios adicionales scrapeados manualmente (ej. si dbMaxEpisode > 39)
+         if (dbMaxEpisode > newFrierenEps.length) {
+             for (let i = newFrierenEps.length + 1; i <= dbMaxEpisode; i++) {
+                 const dbEpInfo = (dbEps && dbEps.find(e => e.episode_number === i)) || {};
+                 newFrierenEps.push({
+                     id: i,
+                     tmdb_episode_id: i,
+                     title: dbEpInfo.episode_name || `Episodio ${i}`,
+                     url: i,
+                     season: dbEpInfo.season_number || 2
+                 });
+             }
+         }
+         
+         finalEpisodes = newFrierenEps;
       }
 
       if (finalEpisodes.length > 0) return finalEpisodes;
@@ -391,6 +460,38 @@ export const api = {
          icon: 'Y',
          lang: language
        }];
+    }
+  },
+
+  getScrapingStatus: async (tmdbId) => {
+    try {
+      const { data } = await supabase
+        .from('scraping_queue')
+        .select('*')
+        .eq('anime_tmdb_id', String(tmdbId))
+        .order('created_at', { ascending: false })
+        .limit(1);
+      return data && data.length > 0 ? data[0] : null;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  },
+
+  requestScraping: async (tmdbId, title) => {
+    try {
+      const { data, error } = await supabase
+        .from('scraping_queue')
+        .insert([{
+          anime_tmdb_id: String(tmdbId),
+          title: title,
+          status: 'pending'
+        }]);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
     }
   }
 };

@@ -1,0 +1,215 @@
+.moviesContainer {
+  padding: 2rem 5%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.title {
+  color: white;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.typeToggle {
+  display: flex;
+  background: var(--surface-light);
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+
+.toggleBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggleBtn:hover {
+  color: white;
+}
+
+.toggleBtn.active {
+  background: var(--primary-accent);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.movieCard {
+  background: var(--surface-light);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.movieCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0,0,0,0.5);
+}
+
+.imageContainer {
+  position: relative;
+  aspect-ratio: 2/3;
+  overflow: hidden;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.movieCard:hover .image {
+  transform: scale(1.05);
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.movieCard:hover .overlay {
+  opacity: 1;
+}
+
+.playButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transform: scale(0.8);
+  transition: transform 0.2s ease;
+}
+
+.playButton:hover {
+  transform: scale(1);
+}
+
+.qualityBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--primary-accent);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.ratingBadge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fbbf24;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.info {
+  padding: 1rem;
+}
+
+.movieTitle {
+  color: white;
+  font-size: 1rem;
+  margin: 0 0 0.5rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.year {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.loading {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 2rem;
+  font-size: 1.2rem;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--surface-light);
+  border-radius: 12px;
+  margin-top: 2rem;
+}
+
+.emptyState h3 {
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.emptyState p {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}

@@ -5,7 +5,7 @@ import styles from './ScraperModal.module.css';
 const ScraperModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     title: '',
-    provider: 'zonaaps', // default a zonaaps o animeonline
+    provider: 'cinebel', // default a cinebel o animeonline
     url: '',
     mode: 'season',
     startEpisode: 1
@@ -119,7 +119,7 @@ const ScraperModal = ({ isOpen, onClose }) => {
               name="url" 
               value={formData.url} 
               onChange={handleChange} 
-              placeholder="https://zonaaps.com/tvshows/..." 
+              placeholder="https://cinebel.com/tvshows/..." 
             />
           </div>
 
@@ -127,7 +127,7 @@ const ScraperModal = ({ isOpen, onClose }) => {
             <div className={styles.formGroup}>
               <label>Proveedor</label>
               <select className={styles.select} name="provider" value={formData.provider} onChange={handleChange}>
-                <option value="zonaaps">ZonaAPS</option>
+                <option value="cinebel">Cinebel</option>
                 <option value="animeonline">AnimeOnline Ninja</option>
               </select>
             </div>

@@ -12,10 +12,12 @@ import './App.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { UIProvider } from './contexts/UIContext';
 import Login from './pages/Login/Login';
+import Movies from './pages/Movies/Movies';
+import MovieWatch from './pages/MovieWatch/MovieWatch';
 
 function App() {
   const location = useLocation();
-  const isWatchPage = location.pathname.startsWith('/watch');
+  const isWatchPage = location.pathname.startsWith('/watch') || location.pathname.startsWith('/movie-watch');
 
   return (
     <AuthProvider>
@@ -30,6 +32,8 @@ function App() {
             <Route path="/secret" element={<SecretZone />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/catalog" element={<Catalog />} />
+            <Route path="/movies" element={<Movies />} />
+            <Route path="/movie-watch" element={<MovieWatch />} />
             <Route path="/login" element={<Login />} />
           </Routes>
         </main>

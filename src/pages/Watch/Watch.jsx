@@ -24,6 +24,11 @@ const Watch = () => {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [savedTime, setSavedTime] = useState(0);
   const [promptShownForEp, setPromptShownForEp] = useState(false);
+  
+  // Facebook states
+  const [fbLoading, setFbLoading] = useState(false);
+  const [resolvedFbUrl, setResolvedFbUrl] = useState(null);
+
   const playerRef = useRef(null);
   const sidebarListRef = useRef(null);
   const activeEpisodeRef = useRef(null);
@@ -36,6 +41,23 @@ const Watch = () => {
     setShowResumePrompt(false);
     lastSavedTime.current = 0;
   }, [episode]);
+
+  useEffect(() => {
+    setResolvedFbUrl(null);
+    if (activeServer && activeServer.url && activeServer.url.includes('facebook.com')) {
+      setFbLoading(true);
+      fetch(`/api/extract-fb?url=${encodeURIComponent(activeServer.url)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setResolvedFbUrl(data.mp4_url);
+          } else {
+            console.error("Error extracted fb:", data.error);
+          }
+        })
+        .finally(() => setFbLoading(false));
+    }
+  }, [activeServer]);
 
   const handleVideoLoaded = () => {
     if (promptShownForEp) return; // Ya se le preguntó para este episodio
@@ -165,15 +187,15 @@ const Watch = () => {
       if (animeInfo) {
         const currentEp = episodes.find(ep => ep.id.toString() === episode.toString());
         const seasonNumber = currentEp ? currentEp.season : 1;
-        const correctEpisodeId = currentEp ? currentEp.tmdb_episode_id : episode;
+        const correctEpisodeId = currentEp ? currentEp.id : episode;
         
         // Obtenemos todos los servidores (de todos los idiomas) para este episodio
         const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, 'sub', animeInfo.id, seasonNumber);
 
-        // Priorizar servidores ZONAAPS o .mp4 para que aparezcan primero
+        // Priorizar servidores CINEBEL o .mp4 para que aparezcan primero
         serversData.sort((a, b) => {
-          const isA_mp4 = a.url?.includes('.mp4') || a.name === 'ZONAAPS';
-          const isB_mp4 = b.url?.includes('.mp4') || b.name === 'ZONAAPS';
+          const isA_mp4 = a.url?.includes('.mp4') || a.name === 'CINEBEL';
+          const isB_mp4 = b.url?.includes('.mp4') || b.name === 'CINEBEL';
           if (isA_mp4 && !isB_mp4) return -1;
           if (!isA_mp4 && isB_mp4) return 1;
           return 0;
@@ -266,7 +288,17 @@ const Watch = () => {
   const currentEpIndex = episodes.findIndex(ep => ep.id.toString() === episode.toString());
   const prevEpisode = currentEpIndex > 0 ? episodes[currentEpIndex - 1] : null;
   const nextEpisode = currentEpIndex >= 0 && currentEpIndex < episodes.length - 1 ? episodes[currentEpIndex + 1] : null;
-  const currentEpTitle = currentEpIndex >= 0 ? episodes[currentEpIndex].title : `Episodio ${episode}`;
+  
+  let currentEpTitle = `Episodio ${episode}`;
+  if (currentEpIndex >= 0) {
+      const epData = episodes[currentEpIndex];
+      const epSeason = epData.season || epData.season_number || 1;
+      const seasonEps = episodes.filter(e => (e.season || e.season_number || 1) === epSeason);
+      const epIndexInSeason = seasonEps.findIndex(e => e.id.toString() === episode.toString());
+      let cleanTitle = epData.title || '';
+      cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
+      currentEpTitle = `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
+  }
 
   // Filtrar servidores a mostrar según el idioma seleccionado
   const visibleServers = servers.filter(s => s.lang === language || s.lang === 'none');
@@ -339,7 +371,40 @@ const Watch = () => {
             <div className={styles.playerContainer} ref={videoContainerRef}>
               <div className={styles.videoWrapper}>
                 {activeServer ? (
-                  activeServer?.url?.includes('.mp4') ? (
+                  activeServer?.url?.includes('facebook.com') ? (
+                    fbLoading ? (
+                      <div className={styles.loadingServer}>Hackeando a Mark Zuckerberg... (Extrayendo MP4 de Facebook)</div>
+                    ) : resolvedFbUrl ? (
+                      <>
+                        <video 
+                          ref={nativeVideoRef}
+                          src={resolvedFbUrl} 
+                          controls 
+                          playsInline
+                          preload="metadata"
+                          poster={animeInfo?.image || ''}
+                          className={styles.iframe}
+                          onLoadedMetadata={handleVideoLoaded}
+                          onTimeUpdate={handleTimeUpdate}
+                        ></video>
+                        
+                        {showResumePrompt && (
+                          <div className={styles.resumeOverlay}>
+                            <div className={styles.resumeBox}>
+                              <h3>Continuar Viendo</h3>
+                              <p>Te quedaste en el minuto {Math.floor(savedTime / 60)}:{(Math.floor(savedTime % 60)).toString().padStart(2, '0')}</p>
+                              <div className={styles.resumeActions}>
+                                <button onClick={handleResume} className={styles.resumeBtn}>Continuar</button>
+                                <button onClick={handleStartOver} className={styles.startOverBtn}>Empezar de cero</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className={styles.loadingServer}>Hubo un error extrayendo el video de Facebook.</div>
+                    )
+                  ) : activeServer?.url?.includes('.mp4') ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
@@ -395,16 +460,23 @@ const Watch = () => {
                   const isNext = nextEpisode && ep.id.toString() === nextEpisode.id.toString();
                   const thumb = animeInfo.image; // Usamos la portada del anime
                   
+                  const epSeason = ep.season || ep.season_number || 1;
+                  const seasonEps = episodes.filter(e => (e.season || e.season_number || 1) === epSeason);
+                  const epIndexInSeason = seasonEps.findIndex(e => e.id.toString() === ep.id.toString());
+                  let cleanTitle = ep.title || '';
+                  cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
+                  const displayTitle = `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
+
                   return (
                     <Link 
-                      key={ep.id} 
-                      to={`/watch/${id}/${ep.id}`}
+                      to={`/watch/${id}/${ep.id}`} 
+                      key={ep.id}
                       ref={isActive ? activeEpisodeRef : null}
                       className={`${styles.sidebarEpisode} ${isActive ? styles.sidebarEpisodeActive : ''}`}
                     >
-                      <img src={thumb} alt={ep.title} className={styles.epThumb} />
+                      <img src={thumb} alt={displayTitle} className={styles.epThumb} />
                       <div className={styles.epInfo}>
-                        <div className={styles.epNumber}>{ep.title}</div>
+                        <div className={styles.epNumber}>{displayTitle}</div>
                         {(isActive || isNext) && (
                           <div className={`${styles.epStatus} ${isActive ? styles.epStatusActive : ''}`}>
                             {isActive ? 'Viendo ahora' : 'Siguiente'}
