@@ -2,12 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { List, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { List, ChevronLeft, ChevronRight, Play, Lightbulb, Cast, EyeOff, SkipForward, FastForward, Maximize, Settings } from 'lucide-react';
 import styles from './Watch.module.css';
 
 const Watch = () => {
   const { id, episode } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
   const [servers, setServers] = useState([]);
   const [activeServer, setActiveServer] = useState(null);
   const [animeInfo, setAnimeInfo] = useState(null);
@@ -25,9 +28,25 @@ const Watch = () => {
   const [savedTime, setSavedTime] = useState(0);
   const [promptShownForEp, setPromptShownForEp] = useState(false);
   
+  // Custom Player States
+  const [cinemaMode, setCinemaMode] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [showSkipIntro, setShowSkipIntro] = useState(false);
+  const [showNextEpisode, setShowNextEpisode] = useState(false);
+  
   // Facebook states
   const [fbLoading, setFbLoading] = useState(false);
   const [resolvedFbUrl, setResolvedFbUrl] = useState(null);
+  const [fbQualities, setFbQualities] = useState(null);
+  const [currentFbQuality, setCurrentFbQuality] = useState('');
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [qualityChangeTime, setQualityChangeTime] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      api.isAdmin(user.email).then(setIsAdmin);
+    }
+  }, [user]);
 
   const playerRef = useRef(null);
   const sidebarListRef = useRef(null);
@@ -36,21 +55,82 @@ const Watch = () => {
   const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
 
+  // Admin Config States
+  const [introStartInput, setIntroStartInput] = useState('');
+  const [introEndInput, setIntroEndInput] = useState('');
+  const [outroStartInput, setOutroStartInput] = useState('');
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  useEffect(() => {
+    if (activeServer) {
+      const formatTime = (seconds) => {
+        if (!seconds) return '';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+      };
+      setIntroStartInput(formatTime(activeServer.skip_start));
+      setIntroEndInput(formatTime(activeServer.skip_end));
+      setOutroStartInput(formatTime(activeServer.outro_start));
+    }
+  }, [activeServer]);
+
+  const handleSaveTimes = async () => {
+    const parseTime = (timeStr) => {
+      if (!timeStr) return null;
+      const parts = timeStr.split(':');
+      if (parts.length === 2) {
+        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      }
+      return parseInt(timeStr);
+    };
+
+    const times = {
+      skip_start: parseTime(introStartInput),
+      skip_end: parseTime(introEndInput),
+      outro_start: parseTime(outroStartInput)
+    };
+
+    const success = await api.updateEpisodeTimes(id, episode, times);
+    if (success) {
+      alert("¡Tiempos guardados exitosamente! 🚀");
+      // Update local state to reflect changes instantly without reload
+      setActiveServer(prev => ({
+        ...prev,
+        skip_start: times.skip_start,
+        skip_end: times.skip_end,
+        outro_start: times.outro_start
+      }));
+      setShowAdminPanel(false);
+    } else {
+      alert("Error al guardar los tiempos.");
+    }
+  };
+
   useEffect(() => {
     setPromptShownForEp(false);
     setShowResumePrompt(false);
+    setShowSkipIntro(false);
+    setShowNextEpisode(false);
     lastSavedTime.current = 0;
   }, [episode]);
 
   useEffect(() => {
     setResolvedFbUrl(null);
-    if (activeServer && activeServer.url && activeServer.url.includes('facebook.com')) {
+    setFbQualities(null);
+    setCurrentFbQuality('');
+    setShowQualityMenu(false);
+    if (activeServer && activeServer.url && (activeServer.url.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) {
       setFbLoading(true);
       fetch(`/api/extract-fb?url=${encodeURIComponent(activeServer.url)}`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
             setResolvedFbUrl(data.mp4_url);
+              if (data.qualities) {
+                setFbQualities(data.qualities);
+                setCurrentFbQuality(data.qualities['720p'] ? '720p' : '360p');
+              }
           } else {
             console.error("Error extracted fb:", data.error);
           }
@@ -59,7 +139,22 @@ const Watch = () => {
     }
   }, [activeServer]);
 
+  const changeQuality = (qKey, url) => {
+    if (nativeVideoRef.current) {
+      setQualityChangeTime(nativeVideoRef.current.currentTime);
+    }
+    setCurrentFbQuality(qKey);
+    setResolvedFbUrl(url);
+    setShowQualityMenu(false);
+  };
+
   const handleVideoLoaded = () => {
+    if (qualityChangeTime !== null && nativeVideoRef.current) {
+      nativeVideoRef.current.currentTime = qualityChangeTime;
+      nativeVideoRef.current.play();
+      setQualityChangeTime(null);
+      return;
+    }
     if (promptShownForEp) return; // Ya se le preguntó para este episodio
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
@@ -88,6 +183,23 @@ const Watch = () => {
   const handleTimeUpdate = () => {
     if (!nativeVideoRef.current) return;
     const currentTime = nativeVideoRef.current.currentTime;
+    
+    // Verificar si estamos en el rango de intro
+    if (activeServer?.skip_start && activeServer?.skip_end) {
+      if (currentTime >= activeServer.skip_start && currentTime < activeServer.skip_end) {
+        setShowSkipIntro(true);
+      } else {
+        setShowSkipIntro(false);
+      }
+    }
+
+    // Verificar si empezó el outro (para Siguiente Episodio)
+    if (activeServer?.outro_start && currentTime >= activeServer.outro_start) {
+      setShowNextEpisode(true);
+    } else {
+      setShowNextEpisode(false);
+    }
+
     // Guardar progreso cada 15 segundos
     if (Math.abs(currentTime - lastSavedTime.current) > 15) {
       lastSavedTime.current = currentTime;
@@ -96,6 +208,42 @@ const Watch = () => {
         ...(prev || {}),
         [key]: currentTime
       }));
+    }
+  };
+
+  const skipIntro = () => {
+    if (nativeVideoRef.current && activeServer?.skip_end) {
+      nativeVideoRef.current.currentTime = activeServer.skip_end;
+      setShowSkipIntro(false);
+    }
+  };
+
+  const handleCast = () => {
+    if (nativeVideoRef.current && nativeVideoRef.current.remote) {
+      nativeVideoRef.current.remote.prompt()
+        .catch(err => {
+          console.error("Error al transmitir", err);
+          alert("Asegúrate de estar en Chrome o Edge y tener tu dispositivo (Samsung TV, Roku) conectado a la misma red Wi-Fi.");
+        });
+    } else {
+      alert("Tu navegador no soporta Google Cast o no tienes un dispositivo compatible cercano.");
+    }
+  };
+
+  const toggleControls = () => {
+    setControlsVisible(prev => !prev);
+  };
+
+  const handleDoubleClick = (e) => {
+    e.preventDefault();
+    if (!document.fullscreenElement) {
+      if (videoContainerRef.current?.requestFullscreen) {
+        videoContainerRef.current.requestFullscreen().catch(err => console.log(err));
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
     }
   };
 
@@ -129,8 +277,18 @@ const Watch = () => {
   useEffect(() => {
     if (!loading && videoContainerRef.current) {
       setTimeout(() => {
-        videoContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
+        const rect = videoContainerRef.current.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        // Ajuste fino para centrar: tiene en cuenta el tamaño de la ventana y un offset para el header
+        const navbarOffset = 80; // Ajusta este valor si el navbar es más grande/pequeño
+        const targetY = scrollTop + rect.top + (rect.height / 2) - (window.innerHeight / 2) - (navbarOffset / 2);
+        
+        window.scrollTo({
+          top: targetY,
+          behavior: 'smooth'
+        });
+      }, 400);
     }
 
     // Auto-scroll de la lista de episodios en la barra lateral
@@ -365,13 +523,15 @@ const Watch = () => {
         </div>
       </div>
 
+      {cinemaMode && <div className={styles.cinemaOverlay} onClick={() => setCinemaMode(false)}></div>}
+
       <div className={styles.watchLayout}>
         <div className={styles.mainContent}>
           <div className={styles.playerSection}>
-            <div className={styles.playerContainer} ref={videoContainerRef}>
+            <div className={`${styles.playerContainer} ${cinemaMode ? styles.playerContainerCinema : ''}`} ref={videoContainerRef}>
               <div className={styles.videoWrapper}>
                 {activeServer ? (
-                  activeServer?.url?.includes('facebook.com') ? (
+                  (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) ? (
                     fbLoading ? (
                       <div className={styles.loadingServer}>Hackeando a Mark Zuckerberg... (Extrayendo MP4 de Facebook)</div>
                     ) : resolvedFbUrl ? (
@@ -379,14 +539,27 @@ const Watch = () => {
                         <video 
                           ref={nativeVideoRef}
                           src={resolvedFbUrl} 
-                          controls 
+                          controls={controlsVisible}
                           playsInline
                           preload="metadata"
                           poster={animeInfo?.image || ''}
                           className={styles.iframe}
                           onLoadedMetadata={handleVideoLoaded}
                           onTimeUpdate={handleTimeUpdate}
+                          onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                         ></video>
+                        
+                        {showSkipIntro && (
+                          <button onClick={skipIntro} className={styles.skipIntroBtn}>
+                            <SkipForward size={20} /> Saltar Intro
+                          </button>
+                        )}
+
+                        {showNextEpisode && nextEpisode && (
+                          <button onClick={() => navigate(`/watch/${id}/${nextEpisode?.id}`)} className={styles.nextEpBtn}>
+                            <FastForward size={20} /> Siguiente Episodio
+                          </button>
+                        )}
                         
                         {showResumePrompt && (
                           <div className={styles.resumeOverlay}>
@@ -402,21 +575,35 @@ const Watch = () => {
                         )}
                       </>
                     ) : (
-                      <div className={styles.loadingServer}>Hubo un error extrayendo el video de Facebook.</div>
+                      <div className={styles.loadingServer}>Hubo un error extrayendo el video de Facebook. URL recibida: {activeServer.url}</div>
                     )
                   ) : activeServer?.url?.includes('.mp4') ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
                         src={activeServer.url} 
-                        controls 
+                        controls={controlsVisible}
                         playsInline
                         preload="metadata"
                         poster={animeInfo?.image || ''}
                         className={styles.iframe}
                         onLoadedMetadata={handleVideoLoaded}
                         onTimeUpdate={handleTimeUpdate}
+                        onDoubleClick={handleDoubleClick}
+                        onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                       ></video>
+                      
+                      {showSkipIntro && (
+                        <button onClick={skipIntro} className={styles.skipIntroBtn}>
+                          <SkipForward size={20} /> Saltar Intro
+                        </button>
+                      )}
+                      
+                      {showNextEpisode && nextEpisode && (
+                        <button onClick={() => navigate(`/watch/${id}/${nextEpisode?.id}`)} className={styles.nextEpBtn}>
+                          <FastForward size={20} /> Siguiente Episodio
+                        </button>
+                      )}
                       
                       {showResumePrompt && (
                         <div className={styles.resumeOverlay}>
@@ -452,6 +639,105 @@ const Watch = () => {
                 )}
               </div>
             </div>
+
+            {/* Custom Toolbar */}
+            <div className={styles.playerToolbar}>
+              <button onClick={() => setCinemaMode(!cinemaMode)} className={styles.toolbarBtn} title="Modo Cine">
+                <Lightbulb size={18} fill={cinemaMode ? 'white' : 'none'} />
+                <span>{cinemaMode ? 'Encender luz' : 'Apagar luz'}</span>
+              </button>
+              
+              {(activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
+                <>
+                  <button onClick={handleDoubleClick} className={styles.toolbarBtn} title="Pantalla Completa">
+                    <Maximize size={18} />
+                    <span>Pantalla Completa</span>
+                  </button>
+                  {fbQualities && Object.keys(fbQualities).length > 1 && (
+                    <div style={{ position: 'relative' }}>
+                      <button onClick={() => setShowQualityMenu(!showQualityMenu)} className={styles.toolbarBtn} title="Calidad">
+                        <Settings size={18} />
+                        <span>{currentFbQuality}</span>
+                      </button>
+                      {showQualityMenu && (
+                        <div className={styles.qualityMenu} style={{ position: 'absolute', bottom: '100%', left: '0', background: 'rgba(0,0,0,0.8)', padding: '5px', borderRadius: '5px', display: 'flex', flexDirection: 'column', gap: '5px', zIndex: 50 }}>
+                          {Object.entries(fbQualities).map(([key, url]) => (
+                            <button key={key} onClick={() => changeQuality(key, url)} style={{ background: currentFbQuality === key ? '#3b82f6' : 'transparent', color: 'white', border: 'none', padding: '5px 10px', cursor: 'pointer', borderRadius: '3px' }}>
+                              {key}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={toggleControls} className={styles.toolbarBtn} title="Ocultar Controles">
+                    <EyeOff size={18} />
+                    <span>{controlsVisible ? 'Ocultar Controles' : 'Mostrar Controles'}</span>
+                  </button>
+                  <button onClick={handleCast} className={styles.toolbarBtn} title="Transmitir a TV (Chromecast/Roku)">
+                    <Cast size={18} />
+                    <span>Transmitir</span>
+                  </button>
+                </>
+              )}
+
+              {isAdmin && (activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+                <button 
+                  onClick={() => setShowAdminPanel(!showAdminPanel)} 
+                  className={styles.toolbarBtn} 
+                  style={{ marginLeft: 'auto' }}
+                >
+                  Editar Tiempos
+                </button>
+              )}
+            </div>
+
+            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+              <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-dark-secondary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid #ef4444' }}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#f8fafc', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⚙️</span> Panel de Control Admin - Tiempos
+                </h4>
+                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    Intro (Inicio)
+                    <input 
+                      type="text" 
+                      placeholder="Ej. 1:30" 
+                      value={introStartInput} 
+                      onChange={e => setIntroStartInput(e.target.value)}
+                      style={{ padding: '8px', borderRadius: '4px', background: 'var(--bg-dark-tertiary)', border: '1px solid var(--glass-border)', color: 'white', marginTop: '6px', width: '90px' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    Intro (Fin)
+                    <input 
+                      type="text" 
+                      placeholder="Ej. 3:00" 
+                      value={introEndInput} 
+                      onChange={e => setIntroEndInput(e.target.value)}
+                      style={{ padding: '8px', borderRadius: '4px', background: 'var(--bg-dark-tertiary)', border: '1px solid var(--glass-border)', color: 'white', marginTop: '6px', width: '90px' }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    Botón Sig. Episodio
+                    <input 
+                      type="text" 
+                      placeholder="Ej. 22:15" 
+                      value={outroStartInput} 
+                      onChange={e => setOutroStartInput(e.target.value)}
+                      style={{ padding: '8px', borderRadius: '4px', background: 'var(--bg-dark-tertiary)', border: '1px solid var(--glass-border)', color: 'white', marginTop: '6px', width: '120px' }}
+                    />
+                  </label>
+                  <button 
+                    onClick={handleSaveTimes}
+                    style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Guardar Tiempos
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '10px 0 0 0' }}>Formato válido: MM:SS (Ej: 1:30) o Segundos (Ej: 90).</p>
+              </div>
+            )}
 
             {/* Sidebar */}
             <div className={styles.sidebar}>
@@ -529,3 +815,10 @@ const Watch = () => {
 };
 
 export default Watch;
+
+
+
+
+
+
+

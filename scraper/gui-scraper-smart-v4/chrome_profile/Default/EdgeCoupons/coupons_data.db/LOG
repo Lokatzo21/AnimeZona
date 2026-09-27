@@ -1,6 +1,15 @@
-2026/08/16-19:21:54.079 3220 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart\chrome_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/08/16-19:21:54.080 3220 Recovering log #110
-2026/08/16-19:21:54.081 3220 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart\chrome_profile\Default\EdgeCoupons/coupons_data.db/000110.log 
-2026/08/16-19:21:54.189 48cc Level-0 table #115: started
-2026/08/16-19:21:54.200 48cc Level-0 table #115: 683376 bytes OK
-2026/08/16-19:21:54.203 48cc Delete type=0 #110
+2026/09/10-23:05:20.771 2f74 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart-v4\chrome_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/09/10-23:05:20.772 2f74 Recovering log #120
+2026/09/10-23:05:20.773 2f74 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart-v4\chrome_profile\Default\EdgeCoupons/coupons_data.db/000120.log 
+2026/09/10-23:05:32.207 2984 Level-0 table #124: started
+2026/09/10-23:05:32.215 2984 Level-0 table #124: 683376 bytes OK
+2026/09/10-23:05:32.217 2984 Delete type=0 #120
+2026/09/10-23:05:32.218 8ec Compacting 4@0 + 1@1 files
+2026/09/10-23:05:32.237 8ec Generated table #125@0: 5 keys, 683471 bytes
+2026/09/10-23:05:32.237 8ec Compacted 4@0 + 1@1 files => 683471 bytes
+2026/09/10-23:05:32.238 8ec compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/09/10-23:05:32.239 8ec Delete type=2 #112
+2026/09/10-23:05:32.239 8ec Delete type=2 #115
+2026/09/10-23:05:32.239 8ec Delete type=2 #118
+2026/09/10-23:05:32.239 8ec Delete type=2 #121
+2026/09/10-23:05:32.239 8ec Delete type=2 #124

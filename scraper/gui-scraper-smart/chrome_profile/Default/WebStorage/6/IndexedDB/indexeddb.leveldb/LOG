@@ -1,0 +1,14 @@
+2026/08/15-23:17:17.262 4e44 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart\chrome_profile\Default\WebStorage\6\IndexedDB\indexeddb.leveldb/MANIFEST-000001
+2026/08/15-23:17:17.262 4e44 Recovering log #51
+2026/08/15-23:17:17.263 4e44 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart\chrome_profile\Default\WebStorage\6\IndexedDB\indexeddb.leveldb/000051.log 
+2026/08/15-23:17:58.834 4e98 Level-0 table #56: started
+2026/08/15-23:17:58.847 4e98 Level-0 table #56: 33342 bytes OK
+2026/08/15-23:17:58.851 4e98 Delete type=0 #51
+2026/08/15-23:17:58.851 4e44 Manual compaction at level-0 from '\x00\x12\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x13\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/08/15-23:17:58.852 4e44 Manual compaction at level-1 from '\x00\x12\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x13\x00\x00\x00' @ 0 : 0; will stop at '\x00\x13\x01\x1f\x04\x03\x01\x06\x00Q\x00U\x00E\x00U\x00E\x00D\x03\x00\x00\x00\x00\x00\x00L@\x03\x00\xd0+\x0c\x90\x00zB\x00\x03\x00\x00\x00\x00\x00\x00\xf0?' @ 2739 : 1
+2026/08/15-23:17:58.852 4e44 Compacting 1@1 + 1@2 files
+2026/08/15-23:17:58.855 4e44 Generated table #57@1: 64 keys, 6286 bytes
+2026/08/15-23:17:58.855 4e44 Compacted 1@1 + 1@2 files => 6286 bytes
+2026/08/15-23:17:58.858 4e44 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/08/15-23:17:58.859 4e44 Delete type=2 #56
+2026/08/15-23:17:58.860 4e44 Manual compaction at level-1 from '\x00\x13\x01\x1f\x04\x03\x01\x06\x00Q\x00U\x00E\x00U\x00E\x00D\x03\x00\x00\x00\x00\x00\x00L@\x03\x00\xd0+\x0c\x90\x00zB\x00\x03\x00\x00\x00\x00\x00\x00\xf0?' @ 2739 : 1 .. '\x00\x13\x00\x00\x00' @ 0 : 0; will stop at (end)

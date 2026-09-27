@@ -1,0 +1,61 @@
+{
+   "checksum": "fc3e30d62d376ae97145420c08ae8745",
+   "roots": {
+      "bookmark_bar": {
+         "children": [ {
+            "date_added": "13433575153564126",
+            "date_last_used": "0",
+            "guid": "bd89651e-2187-47ce-af87-214b5919c896",
+            "id": "7",
+            "name": "Sanda Latino - Anime DBS",
+            "show_icon": false,
+            "source": "user_add",
+            "type": "url",
+            "url": "https://www.animedbs.online/anime/sanda-latino/",
+            "visit_count": 1
+         } ],
+         "date_added": "13433575094039025",
+         "date_last_used": "0",
+         "date_modified": "13433575153564126",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Barra de favoritos",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "other": {
+         "children": [  ],
+         "date_added": "13433575094039025",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Otros favoritos",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [  ],
+         "date_added": "13433575094039025",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Favoritos móviles",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "workspaces_v2": {
+         "children": [  ],
+         "date_added": "13433575094039025",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "75aa6670-344f-549d-b742-660f029506ab",
+         "id": "5",
+         "name": "Áreas de trabajo",
+         "source": "unknown",
+         "type": "folder"
+      }
+   },
+   "version": 1
+}

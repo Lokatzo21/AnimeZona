@@ -1,6 +1,3 @@
-2026/08/16-19:21:50.443 960 Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart\chrome_profile\Default\Local Storage\leveldb/MANIFEST-000001
-2026/08/16-19:21:50.456 960 Recovering log #4
-2026/08/16-19:21:50.461 960 Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart\chrome_profile\Default\Local Storage\leveldb/000004.log 
-2026/08/16-19:22:30.979 448c Level-0 table #8: started
-2026/08/16-19:22:30.994 448c Level-0 table #8: 11678 bytes OK
-2026/08/16-19:22:31.000 448c Delete type=0 #4
+2026/09/10-23:05:17.457 3d2c Reusing MANIFEST C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart-v4\chrome_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/09/10-23:05:17.468 3d2c Recovering log #10
+2026/09/10-23:05:17.474 3d2c Reusing old log C:\Users\manue\OneDrive\Documentos\Anime\scraper\gui-scraper-smart-v4\chrome_profile\Default\Local Storage\leveldb/000010.log 

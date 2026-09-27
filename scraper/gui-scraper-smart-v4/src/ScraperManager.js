@@ -8,6 +8,7 @@ const fs = require('fs');
 // Proveedores
 const AnimeOnlineProvider = require('./providers/AnimeOnline');
 const CinebelProvider = require('./providers/Cinebel');
+const AnimeDBSProvider = require('./providers/AnimeDBS');
 
 class ScraperManager {
   constructor() {
@@ -115,6 +116,9 @@ class ScraperManager {
     }
     if (providerKey === 'cinebel' || url.includes('cinebel.cc')) {
       return new CinebelProvider(this.browser, this.client);
+    }
+    if (providerKey === 'animedbs' || url.includes('animedbs.online')) {
+      return new AnimeDBSProvider(this.browser, this.client);
     }
     throw new Error('Proveedor no soportado o no detectado.');
   }

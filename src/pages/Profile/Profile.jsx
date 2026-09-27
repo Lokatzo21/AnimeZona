@@ -13,6 +13,7 @@ const Profile = () => {
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [customLists, setCustomLists] = useLocalStorage('customLists', []);
   const [activeTab, setActiveTab] = useState('historial');
 
   const [isEditing, setIsEditing] = useState(false);
@@ -135,6 +136,12 @@ const Profile = () => {
           Favoritos
         </button>
         <button 
+          className={`${styles.tabBtn} ${activeTab === 'listas' ? styles.active : ''}`}
+          onClick={() => setActiveTab('listas')}
+        >
+          Mis Listas
+        </button>
+        <button 
           className={`${styles.tabBtn} ${activeTab === 'ocultos' ? styles.active : ''}`}
           onClick={() => setActiveTab('ocultos')}
           style={{ color: activeTab === 'ocultos' ? '#ff4444' : 'inherit' }}
@@ -198,6 +205,71 @@ const Profile = () => {
                     isFavorite={true}
                     onToggleFavorite={handleToggleFavorite}
                   />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'listas' && (
+          <div>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h2 className={styles.sectionTitle} style={{marginBottom: 0}}>Mis Listas Personales</h2>
+              <button 
+                onClick={() => {
+                  const name = prompt("Nombre de la nueva lista:");
+                  if(name) setCustomLists([...(customLists || []), {id: `list-${Date.now()}`, name, animes: []}]);
+                }}
+                className={styles.editBtn}
+                style={{padding: '5px 15px'}}
+              >
+                + Crear Lista
+              </button>
+            </div>
+            
+            {(customLists || []).length === 0 ? (
+              <p className={styles.emptyMsg}>No has creado ninguna lista aún. (Ej: "Isekais", "Por ver")</p>
+            ) : (
+              <div style={{display: 'flex', flexDirection: 'column', gap: '30px'}}>
+                {(customLists || []).map(list => (
+                  <div key={list.id} style={{background: '#1e293b', padding: '20px', borderRadius: '10px'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                      <h3 style={{color: 'white', margin: 0, fontSize: '1.2rem'}}>{list.name} <span style={{fontSize:'0.9rem', color:'#94a3b8'}}>({list.animes?.length || 0} animes)</span></h3>
+                      <button 
+                        onClick={() => {
+                          if(confirm(`¿Eliminar la lista "${list.name}"?`)) {
+                            setCustomLists((customLists || []).filter(l => l.id !== list.id));
+                          }
+                        }}
+                        style={{background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer'}}
+                      >
+                        Eliminar Lista
+                      </button>
+                    </div>
+                    {(!list.animes || list.animes.length === 0) ? (
+                       <p style={{color: '#94a3b8', fontSize: '0.9rem'}}>Lista vacía.</p>
+                    ) : (
+                      <div className={styles.grid}>
+                        {list.animes.map(anime => (
+                          <div key={`${list.id}-${anime.id}`} style={{position: 'relative'}}>
+                            <AnimeCard anime={anime} />
+                            <button 
+                              onClick={() => {
+                                setCustomLists(customLists.map(l => {
+                                  if(l.id === list.id) return { ...l, animes: l.animes.filter(a => a.id !== anime.id) };
+                                  return l;
+                                }));
+                              }}
+                              style={{position: 'absolute', top: '5px', right: '5px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10}}
+                              title="Quitar de la lista"
+                            >
+                              X
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

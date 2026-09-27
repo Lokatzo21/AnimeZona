@@ -455,4 +455,132 @@
     padding: 0.6rem 1rem;
     white-space: nowrap;
   }
+}/* Custom Player UI */
+.cinemaOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.95);
+  z-index: 9998;
+  transition: background-color 0.3s ease;
 }
+
+.playerContainerCinema {
+  position: relative;
+  z-index: 9999;
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+}
+
+.skipIntroBtn {
+  position: absolute;
+  bottom: 110px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.3);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  z-index: 10;
+  transition: transform 0.2s, background-color 0.2s;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+.skipIntroBtn:hover {
+  transform: scale(1.05);
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+.playerToolbar {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 15px;
+  background: var(--bg-dark-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius-lg);
+  align-items: center;
+}
+
+.toolbarBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-dark-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.toolbarBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+@media (max-width: 768px) {
+  .playerToolbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px;
+    gap: 8px;
+  }
+  
+  .toolbarBtn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 10px 8px;
+    font-size: 0.8rem;
+  }
+
+  .skipIntroBtn {
+    bottom: 50px;
+    right: 10px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+}
+.nextEpBtn {
+  position: absolute;
+  bottom: 110px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.3);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  z-index: 10;
+  transition: transform 0.2s, background-color 0.2s;
+  backdrop-filter: blur(4px);
+}
+.nextEpBtn:hover {
+  transform: scale(1.05);
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 768px) {
+  .nextEpBtn {
+    bottom: 50px;
+    right: 10px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+}
+
+
+
+
+
+

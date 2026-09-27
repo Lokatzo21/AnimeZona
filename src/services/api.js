@@ -429,7 +429,10 @@ export const api = {
                    lat.server_name.includes('STREAMWISH') ? '#8b5cf6' : 
                    lat.server_name.includes('ZOPLAYER') ? '#f59e0b' : '#64748b',
             icon: 'S',
-            lang: lat.language
+            lang: lat.language,
+            skip_start: lat.skip_start || null,
+            skip_end: lat.skip_end || null,
+            outro_start: lat.outro_start || null
           }));
           
           servers = servers.filter((server, index, self) =>
@@ -491,6 +494,21 @@ export const api = {
       return true;
     } catch (e) {
       console.error(e);
+      return false;
+    }
+  },
+
+  updateEpisodeTimes: async (tmdbId, episodeNumber, times) => {
+    try {
+      const { data, error } = await supabase
+        .from('anime_episodes')
+        .update(times)
+        .eq('anime_tmdb_id', String(tmdbId))
+        .eq('episode_number', parseInt(episodeNumber, 10));
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error("Error actualizando tiempos:", e);
       return false;
     }
   }

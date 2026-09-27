@@ -116,7 +116,10 @@ class AnimeOnlineProvider extends BaseProvider {
 
     this.log(`Se encontraron ${episodeLinks.length} episodios en total!`, 'success');
 
-    for (let i = 0; i < episodeLinks.length; i++) {
+    // Mover el índice de inicio
+    const startIndex = Math.max(0, startEpisode - 1);
+
+    for (let i = startIndex; i < episodeLinks.length; i++) {
         const epUrl = episodeLinks[i];
         
         this.log(`Procesando Episodio ${currentEpisodeNumber}...`, 'info');
@@ -216,51 +219,62 @@ class AnimeOnlineProvider extends BaseProvider {
         const langObj = targetLanguage;
         
         this.log(`\n=== Procesando ÚNICO Idioma Elegido: ${langObj.lang.toUpperCase()} ===`, 'info');
-        
         if (langObj.elIndex !== -1) {
-                // Hacemos click en el idioma
-                await playerFrame.evaluate((idx) => {
-                    const li = document.querySelectorAll('li')[idx];
-                    if (li) {
-                        li.click();
-                        try { const fn = new Function(li.getAttribute('onclick')); fn.call(li); } catch(e) {}
-                    }
-                }, langObj.elIndex);
-                await this.delay(3000); // Esperar a que carguen los botones de los servidores
+            // Hacemos click en el idioma
+            await playerFrame.evaluate((idx) => {
+                const li = document.querySelectorAll('li')[idx];
+                if (li) {
+                    li.click();
+                    try { const fn = new Function(li.getAttribute('onclick')); fn.call(li); } catch(e) {}
+                }
+            }, langObj.elIndex);
+            await this.delay(4000); // Wait for potential iframe reload
+            
+            // Re-fetch playerFrame in case clicking the language reloaded the iframe
+            playerFrame = null;
+            for (const frame of targetPage.frames()) {
+              if (frame.url().includes('saidochesto.top')) {
+                playerFrame = frame;
+                break;
+              }
             }
+            if (!playerFrame) playerFrame = targetPage.mainFrame();
+        }
 
-            // Detectar servidores disponibles para este idioma
-            const availableServers = await playerFrame.evaluate(() => {
-                const lis = Array.from(document.querySelectorAll('li'));
-                // Servidores recomendados por el usuario
-                const priorities = ['ZOPLAYER', 'EARNVIDS', 'STREAMWISH', 'SAVEFILES', 'FILEMOON', 'VIDARA', 'FILELIONS', 'UQLOAD', 'STREAMTAPE'];
-                const found = [];
-                
-                for (const serverName of priorities) {
-                    const btn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes(serverName) && li.offsetWidth > 0 && li.offsetHeight > 0);
-                    if (btn) {
-                        found.push({ name: serverName, index: lis.indexOf(btn) });
-                    }
+        // Detectar servidores disponibles para este idioma
+        const availableServers = await playerFrame.evaluate(() => {
+            const lis = Array.from(document.querySelectorAll('li'));
+            const found = [];
+            lis.forEach((li, index) => {
+                // Ignorar elementos ocultos
+                if (li.offsetWidth === 0 || li.offsetHeight === 0) {
+                    return;
                 }
                 
-                // Fallbacks si no se encontró nada de los recomendados
-                if (found.length === 0) {
-                    const hdBtn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes('HD') && li.offsetWidth > 0 && li.offsetHeight > 0);
-                    if (hdBtn) found.push({ name: 'HD_FALLBACK', index: lis.indexOf(hdBtn) });
-                    
-                    if (found.length === 0) {
-                        const anyBtn = lis.find(li => li.offsetWidth > 0 && li.offsetHeight > 0 && !li.innerHTML.toUpperCase().includes('PNG') && !li.textContent.toUpperCase().includes('LAT') && !li.textContent.toUpperCase().includes('SUB'));
-                        if (anyBtn) found.push({ name: 'ANY_FALLBACK', index: lis.indexOf(anyBtn) });
-                    }
+                // Intentar sacar solo el nombre del servidor (suele estar en un span.title o es la primera palabra)
+                let serverName = "";
+                const titleSpan = li.querySelector('.title');
+                if (titleSpan) {
+                    serverName = titleSpan.textContent.trim().toUpperCase();
+                } else {
+                    const text = li.textContent.trim().toUpperCase();
+                    serverName = text.split('\n')[0].split(' ')[0].replace(/[^A-Z0-9]/g, '').trim();
                 }
+
+                if (!serverName || ['LATINO', 'SUBTITULADO', 'CASTELLANO', 'LAT', 'SUB', 'CAST', 'ESPAÑOL'].includes(serverName)) return;
                 
-                return found;
+                found.push({ name: serverName, index: index });
             });
+            
+            return found;
+        });
 
-            // Lógica STREAMTAPE: Quitarlo si hay otras opciones en la web
+            // Lógica para omitir servidores de baja calidad si hay opciones mejores
             let serversToExtract = availableServers;
-            if (availableServers.length > 1) {
-                serversToExtract = serversToExtract.filter(s => s.name.toUpperCase() !== 'STREAMTAPE');
+            const badServers = ['STREAMTAPE', 'MIXDROP', 'HEXUPLOAD'];
+            const goodServers = serversToExtract.filter(s => !badServers.includes(s.name.toUpperCase()));
+            if (goodServers.length > 0) {
+                serversToExtract = goodServers;
             }
 
             // Omitir servidores que ya existen en la BD para este episodio e idioma
@@ -290,22 +304,30 @@ class AnimeOnlineProvider extends BaseProvider {
                 await this.delay(3000); // Dar tiempo al iframe interno a que se genere
 
                 let videoUrl = null;
-                const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara', 'gupload'];
+                const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara', 'gupload', 'mixdrop', 'mega', 'mediafire', 'dood', 'okru', 'vk', 'uptobox', 'voe', 'vidoza', 'sb', 'fembed', 'yourupload'];
 
-                for (let attempt = 0; attempt < 20; attempt++) { // Reducimos intentos por servidor de 30 a 20 para no tardar una eternidad
-                    if (playerFrame) {
-                        try {
-                            await playerFrame.evaluate(() => {
-                                const botHumano = document.querySelector('.BotHumano');
-                                if (botHumano && botHumano.offsetHeight > 0) botHumano.click();
-                                else {
-                                    const divs = Array.from(document.querySelectorAll('div'));
-                                    const clickDiv = divs.find(d => d.innerText && d.innerText.includes('Haz clic en el botón de reproducción'));
-                                    if (clickDiv) clickDiv.click();
-                                }
-                            });
-                        } catch(e) {}
+                for (let attempt = 0; attempt < 20; attempt++) { 
+                    // Re-fetch playerFrame constantly because it might detach when navigating
+                    let currentFrame = null;
+                    for (const frame of targetPage.frames()) {
+                      if (frame.url().includes('saidochesto.top')) {
+                        currentFrame = frame;
+                        break;
+                      }
                     }
+                    if (!currentFrame) currentFrame = targetPage.mainFrame();
+
+                    try {
+                        await currentFrame.evaluate(() => {
+                            const botHumano = document.querySelector('.BotHumano');
+                            if (botHumano && botHumano.offsetHeight > 0) botHumano.click();
+                            else {
+                                const divs = Array.from(document.querySelectorAll('div'));
+                                const clickDiv = divs.find(d => d.innerText && d.innerText.includes('Haz clic en el botón de reproducción'));
+                                if (clickDiv) clickDiv.click();
+                            }
+                        });
+                    } catch(e) {}
 
                     // 1. Buscar en todos los frames cargados en Puppeteer
                     for (const frame of targetPage.frames()) {
@@ -318,9 +340,9 @@ class AnimeOnlineProvider extends BaseProvider {
                     if (videoUrl) break;
 
                     // 2. Buscar inyecciones directas en el DOM del playerFrame
-                    if (playerFrame && !videoUrl) {
+                    if (!videoUrl) {
                         try {
-                            videoUrl = await playerFrame.evaluate((hosts) => {
+                            videoUrl = await currentFrame.evaluate((hosts) => {
                                 const ifr = document.querySelector('iframe#IFR');
                                 if (ifr && ifr.src && hosts.some(h => ifr.src.toLowerCase().includes(h))) {
                                     return ifr.src;
@@ -401,7 +423,7 @@ class AnimeOnlineProvider extends BaseProvider {
                                         'file not found',
                                         'video is no longer available',
                                         'file expired',
-                                        'page not found',
+                                        'page not found', '404 not found', 'video not found', 'not found',
                                         'file was locked by administrator'
                                     ];
                                     
@@ -429,11 +451,22 @@ class AnimeOnlineProvider extends BaseProvider {
                         continue;
                     }
 
-                    await this.client.query(
-                        `INSERT INTO anime_episodes (search_title, episode_number, server_name, video_url, language) VALUES ($1, $2, $3, $4, $5)`,
-                        [title.toLowerCase(), currentEpisodeNumber, server.name, videoUrl, langObj.lang]
-                    );
-                    this.log(`[EXITO] Guardado ${server.name} (${langObj.lang})`, 'success');
+                    const query = `
+                        INSERT INTO anime_episodes 
+                        (search_title, episode_number, server_name, video_url, language, season_number, episode_name, anime_tmdb_id) 
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    `;
+                    let s_num = null;
+                    let e_name = null;
+                    if (this.tmdbEpisodesMap && this.tmdbEpisodesMap.length > 0) {
+                        const tmdbEp = this.tmdbEpisodesMap.find(ep => ep.absolute_number === currentEpisodeNumber);
+                        if (tmdbEp) {
+                            s_num = tmdbEp.season_number;
+                            e_name = tmdbEp.name;
+                        }
+                    }
+                    await this.client.query(query, [title.toLowerCase(), currentEpisodeNumber, server.name || serverName, videoUrl, langObj.lang, s_num, e_name, this.tmdbId]);
+                    this.log(`✅ [EXITO] Guardado ${server.name} (${langObj.lang})`, 'success');
                     successCount++;
                 }
             }
@@ -556,34 +589,45 @@ class AnimeOnlineProvider extends BaseProvider {
                 try { const fn = new Function(li.getAttribute('onclick')); fn.call(li); } catch(e) {}
             }
         }, langObj.elIndex);
-        await this.delay(3000); 
+        await this.delay(4000); 
+        
+        playerFrame = null;
+        for (const frame of targetPage.frames()) {
+          if (frame.url().includes('saidochesto.top')) {
+            playerFrame = frame;
+            break;
+          }
+        }
+        if (!playerFrame) playerFrame = targetPage.mainFrame();
     }
 
     const availableServers = await playerFrame.evaluate(() => {
         const lis = Array.from(document.querySelectorAll('li'));
-        const priorities = ['ZOPLAYER', 'EARNVIDS', 'STREAMWISH', 'SAVEFILES', 'FILEMOON', 'VIDARA', 'FILELIONS', 'UQLOAD', 'STREAMTAPE'];
         const found = [];
-        
-        for (const serverName of priorities) {
-            const btn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes(serverName) && li.offsetWidth > 0 && li.offsetHeight > 0);
-            if (btn) found.push({ name: serverName, index: lis.indexOf(btn) });
-        }
-        
-        if (found.length === 0) {
-            const hdBtn = lis.find(li => li.textContent && li.textContent.toUpperCase().includes('HD') && li.offsetWidth > 0 && li.offsetHeight > 0);
-            if (hdBtn) found.push({ name: 'HD_FALLBACK', index: lis.indexOf(hdBtn) });
-            
-            if (found.length === 0) {
-                const anyBtn = lis.find(li => li.offsetWidth > 0 && li.offsetHeight > 0 && !li.innerHTML.toUpperCase().includes('PNG') && !li.textContent.toUpperCase().includes('LAT') && !li.textContent.toUpperCase().includes('SUB'));
-                if (anyBtn) found.push({ name: 'ANY_FALLBACK', index: lis.indexOf(anyBtn) });
+        lis.forEach((li, index) => {
+            // Ignorar elementos ocultos
+            if (li.offsetWidth === 0 || li.offsetHeight === 0) {
+                return;
             }
-        }
+            let serverName = "";
+            const titleSpan = li.querySelector('.title');
+            if (titleSpan) {
+                serverName = titleSpan.textContent.trim().toUpperCase();
+            } else {
+                const text = li.textContent.trim().toUpperCase();
+                serverName = text.split('\n')[0].split(' ')[0].replace(/[^A-Z0-9]/g, '').trim();
+            }
+            if (!serverName || ['LATINO', 'SUBTITULADO', 'CASTELLANO', 'LAT', 'SUB', 'CAST', 'ESPAÑOL'].includes(serverName)) return;
+            found.push({ name: serverName, index: index });
+        });
         return found;
     });
 
     let serversToExtract = availableServers;
-    if (availableServers.length > 1) {
-        serversToExtract = serversToExtract.filter(s => s.name.toUpperCase() !== 'STREAMTAPE');
+    const badServers = ['STREAMTAPE', 'MIXDROP', 'HEXUPLOAD'];
+    const goodServers = serversToExtract.filter(s => !badServers.includes(s.name.toUpperCase()));
+    if (goodServers.length > 0) {
+        serversToExtract = goodServers;
     }
 
     const alreadySaved = existingServers[langObj.lang] || new Set();
@@ -608,22 +652,29 @@ class AnimeOnlineProvider extends BaseProvider {
         await this.delay(3000); 
 
         let videoUrl = null;
-        const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara', 'gupload'];
+        const knownHosts = ['filemoon', 'filemooon', 'filelions', 'earnvids', 'uqload', 'streamtape', 'zoplayer', 'streamwish', 'savefiles', 'vidara', 'gupload', 'mixdrop', 'mega', 'mediafire', 'dood', 'okru', 'vk', 'uptobox', 'voe', 'vidoza', 'sb', 'fembed', 'yourupload'];
 
         for (let attempt = 0; attempt < 20; attempt++) { 
-            if (playerFrame) {
-                try {
-                    await playerFrame.evaluate(() => {
-                        const botHumano = document.querySelector('.BotHumano');
-                        if (botHumano && botHumano.offsetHeight > 0) botHumano.click();
-                        else {
-                            const divs = Array.from(document.querySelectorAll('div'));
-                            const clickDiv = divs.find(d => d.innerText && d.innerText.includes('Haz clic en el botón de reproducción'));
-                            if (clickDiv) clickDiv.click();
-                        }
-                    });
-                } catch(e) {}
+            let currentFrame = null;
+            for (const frame of targetPage.frames()) {
+              if (frame.url().includes('saidochesto.top')) {
+                currentFrame = frame;
+                break;
+              }
             }
+            if (!currentFrame) currentFrame = targetPage.mainFrame();
+
+            try {
+                await currentFrame.evaluate(() => {
+                    const botHumano = document.querySelector('.BotHumano');
+                    if (botHumano && botHumano.offsetHeight > 0) botHumano.click();
+                    else {
+                        const divs = Array.from(document.querySelectorAll('div'));
+                        const clickDiv = divs.find(d => d.innerText && d.innerText.includes('Haz clic en el botón de reproducción'));
+                        if (clickDiv) clickDiv.click();
+                    }
+                });
+            } catch(e) {}
 
             for (const frame of targetPage.frames()) {
                const fUrl = frame.url().toLowerCase();
@@ -634,9 +685,9 @@ class AnimeOnlineProvider extends BaseProvider {
             }
             if (videoUrl) break;
 
-            if (playerFrame && !videoUrl) {
+            if (currentFrame && !videoUrl) {
                 try {
-                    videoUrl = await playerFrame.evaluate((hosts) => {
+                    videoUrl = await currentFrame.evaluate((hosts) => {
                         const ifr = document.querySelector('iframe#IFR');
                         if (ifr && ifr.src && hosts.some(h => ifr.src.toLowerCase().includes(h))) {
                             return ifr.src;
@@ -717,7 +768,7 @@ class AnimeOnlineProvider extends BaseProvider {
                                 'file not found',
                                 'video is no longer available',
                                 'file expired',
-                                'page not found',
+                                'page not found', '404 not found', 'video not found', 'not found',
                                 'file was locked by administrator'
                             ];
                             
@@ -745,11 +796,22 @@ class AnimeOnlineProvider extends BaseProvider {
                 continue;
             }
 
-            await this.client.query(
-                `INSERT INTO anime_episodes (search_title, episode_number, server_name, video_url, language) VALUES ($1, $2, $3, $4, $5)`,
-                [title.toLowerCase(), currentEpisodeNumber, server.name, videoUrl, langObj.lang]
-            );
-            this.log(`[EXITO] Guardado ${server.name} (${langObj.lang})`, 'success');
+            const query = `
+                INSERT INTO anime_episodes 
+                (search_title, episode_number, server_name, video_url, language, season_number, episode_name, anime_tmdb_id) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `;
+            let s_num = null;
+            let e_name = null;
+            if (this.tmdbEpisodesMap && this.tmdbEpisodesMap.length > 0) {
+                const tmdbEp = this.tmdbEpisodesMap.find(ep => ep.absolute_number === currentEpisodeNumber);
+                if (tmdbEp) {
+                    s_num = tmdbEp.season_number;
+                    e_name = tmdbEp.name;
+                }
+            }
+            await this.client.query(query, [title.toLowerCase(), currentEpisodeNumber, server.name, videoUrl, langObj.lang, s_num, e_name, this.tmdbId]);
+            this.log(`✅ [EXITO] Guardado ${server.name} (${langObj.lang})`, 'success');
             successCount++;
         }
     }

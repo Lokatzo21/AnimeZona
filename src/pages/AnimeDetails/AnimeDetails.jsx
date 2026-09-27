@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Play, Eye, Heart, Check } from 'lucide-react';
 import { api } from '../../services/api';
@@ -23,6 +23,8 @@ const AnimeDetails = () => {
   const { showToast, showConfirm } = useUI();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showListModal, setShowListModal] = useState(false);
+  const [availableLists, setAvailableLists] = useState([]);
 
   useEffect(() => {
     if (user?.email) {
@@ -365,6 +367,52 @@ const AnimeDetails = () => {
           })}
         </div>
       </div>
+
+      {/* Modal de Listas */}
+      {showListModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }} onClick={() => setShowListModal(false)}>
+          <div style={{ background: '#0f172a', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '500px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', border: '1px solid #334155', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #1e293b', paddingBottom: '15px' }}>
+              <h3 style={{ color: 'white', margin: 0, fontSize: '1.4rem' }}>Guardar en Lista</h3>
+              <button onClick={() => setShowListModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>X</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '5px' }}>
+              {availableLists.map(list => {
+                 const isAdded = list.animes && list.animes.some(a => a.id === animeInfo.id);
+                 return (
+                 <button 
+                   key={list.id} 
+                   onClick={() => {
+                     if (!list.animes) list.animes = [];
+                     if (!isAdded) {
+                       list.animes.push({id: animeInfo.id, title: animeInfo.title, image: animeInfo.image});
+                       const updatedLists = availableLists.map(l => l.id === list.id ? list : l);
+                       localStorage.setItem('customLists', JSON.stringify(updatedLists));
+                       setAvailableLists(updatedLists);
+                       showToast("Añadido a " + list.name);
+                     } else {
+                       const updatedAnimes = list.animes.filter(a => a.id !== animeInfo.id);
+                       list.animes = updatedAnimes;
+                       const updatedLists = availableLists.map(l => l.id === list.id ? list : l);
+                       localStorage.setItem('customLists', JSON.stringify(updatedLists));
+                       setAvailableLists(updatedLists);
+                       showToast("Removido de " + list.name);
+                     }
+                   }}
+                   style={{ padding: '16px', background: isAdded ? 'rgba(16, 185, 129, 0.1)' : '#1e293b', border: isAdded ? '1px solid #10b981' : '1px solid #334155', borderRadius: '12px', color: 'white', cursor: 'pointer', textAlign: 'left', fontSize: '1.1rem', transition: 'all 0.2s ease' }}
+                   onMouseOver={(e) => !isAdded && (e.currentTarget.style.background = '#334155')}
+                   onMouseOut={(e) => !isAdded && (e.currentTarget.style.background = '#1e293b')}
+                 >
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontWeight: isAdded ? '600' : '400', color: isAdded ? '#10b981' : '#f8fafc' }}>{list.name}</span>
+                     {isAdded && <span style={{ fontSize: '0.9rem', background: '#10b981', color: '#000', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>✓ Guardado</span>}
+                   </div>
+                 </button>
+              )})}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
