@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Play, Eye, Heart, Check } from 'lucide-react';
 import { api } from '../../services/api';
@@ -221,7 +221,27 @@ const AnimeDetails = () => {
               <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
               {isFavorite ? 'En Favoritos' : 'Añadir a Favoritos'}
             </button>
-            
+
+            <button
+              className={styles.favoriteToggle}
+              style={{ background: '#334155', color: '#f8fafc', marginLeft: '10px' }}
+              onClick={() => {
+                const lists = JSON.parse(localStorage.getItem('customLists') || '[]');
+                if (lists.length === 0) {
+                  alert('No tienes listas. Créalas en tu Perfil > Mis Listas.');
+                  return;
+                }
+                setAvailableLists(lists);
+                setShowListModal(true);
+              }}
+            >
+              {(() => {
+                const lists = JSON.parse(localStorage.getItem('customLists') || '[]');
+                const inAny = lists.some(l => l.animes && l.animes.some(a => a.id === animeInfo.id));
+                return inAny ? '✓ En Lista' : '+ Añadir a Lista';
+              })()}
+            </button>
+
             {/* Scraping Button/Status (Only Admin) */}
             {isAdmin && (
               !scrapingStatus || scrapingStatus.status === 'error' ? (
