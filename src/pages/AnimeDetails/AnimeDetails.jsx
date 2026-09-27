@@ -18,13 +18,13 @@ const AnimeDetails = () => {
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const [customLists, setCustomLists] = useLocalStorage('customLists', []);
   const [scrapingStatus, setScrapingStatus] = useState(null);
   const navigate = useNavigate();
   const { showToast, showConfirm } = useUI();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
-  const [availableLists, setAvailableLists] = useState([]);
 
   useEffect(() => {
     if (user?.email) {
@@ -226,20 +226,16 @@ const AnimeDetails = () => {
               className={styles.favoriteToggle}
               style={{ background: '#334155', color: '#f8fafc', marginLeft: '10px' }}
               onClick={() => {
-                const lists = JSON.parse(localStorage.getItem('customLists') || '[]');
-                if (lists.length === 0) {
-                  alert('No tienes listas. Créalas en tu Perfil > Mis Listas.');
+                if (!customLists || customLists.length === 0) {
+                  showToast('No tienes listas. Créalas en tu Perfil > Mis Listas.');
                   return;
                 }
-                setAvailableLists(lists);
                 setShowListModal(true);
               }}
             >
-              {(() => {
-                const lists = JSON.parse(localStorage.getItem('customLists') || '[]');
-                const inAny = lists.some(l => l.animes && l.animes.some(a => a.id === animeInfo.id));
-                return inAny ? '✓ En Lista' : '+ Añadir a Lista';
-              })()}
+              {(customLists || []).some(l => l.animes && l.animes.some(a => a.id === animeInfo.id))
+                ? '✓ En Lista'
+                : '+ Añadir a Lista'}
             </button>
 
             {/* Scraping Button/Status (Only Admin) */}
@@ -394,41 +390,39 @@ const AnimeDetails = () => {
           <div style={{ background: '#0f172a', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '500px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', border: '1px solid #334155', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #1e293b', paddingBottom: '15px' }}>
               <h3 style={{ color: 'white', margin: 0, fontSize: '1.4rem' }}>Guardar en Lista</h3>
-              <button onClick={() => setShowListModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>X</button>
+              <button onClick={() => setShowListModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
             </div>
             <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '5px' }}>
-              {availableLists.map(list => {
-                 const isAdded = list.animes && list.animes.some(a => a.id === animeInfo.id);
-                 return (
-                 <button 
-                   key={list.id} 
-                   onClick={() => {
-                     if (!list.animes) list.animes = [];
-                     if (!isAdded) {
-                       list.animes.push({id: animeInfo.id, title: animeInfo.title, image: animeInfo.image});
-                       const updatedLists = availableLists.map(l => l.id === list.id ? list : l);
-                       localStorage.setItem('customLists', JSON.stringify(updatedLists));
-                       setAvailableLists(updatedLists);
-                       showToast("Añadido a " + list.name);
-                     } else {
-                       const updatedAnimes = list.animes.filter(a => a.id !== animeInfo.id);
-                       list.animes = updatedAnimes;
-                       const updatedLists = availableLists.map(l => l.id === list.id ? list : l);
-                       localStorage.setItem('customLists', JSON.stringify(updatedLists));
-                       setAvailableLists(updatedLists);
-                       showToast("Removido de " + list.name);
-                     }
-                   }}
-                   style={{ padding: '16px', background: isAdded ? 'rgba(16, 185, 129, 0.1)' : '#1e293b', border: isAdded ? '1px solid #10b981' : '1px solid #334155', borderRadius: '12px', color: 'white', cursor: 'pointer', textAlign: 'left', fontSize: '1.1rem', transition: 'all 0.2s ease' }}
-                   onMouseOver={(e) => !isAdded && (e.currentTarget.style.background = '#334155')}
-                   onMouseOut={(e) => !isAdded && (e.currentTarget.style.background = '#1e293b')}
-                 >
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontWeight: isAdded ? '600' : '400', color: isAdded ? '#10b981' : '#f8fafc' }}>{list.name}</span>
-                     {isAdded && <span style={{ fontSize: '0.9rem', background: '#10b981', color: '#000', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>✓ Guardado</span>}
-                   </div>
-                 </button>
-              )})}
+              {(customLists || []).map(list => {
+                const isAdded = list.animes && list.animes.some(a => a.id === animeInfo.id);
+                return (
+                  <button
+                    key={list.id}
+                    onClick={() => {
+                      const updated = (customLists || []).map(l => {
+                        if (l.id !== list.id) return l;
+                        const animes = l.animes || [];
+                        if (!isAdded) {
+                          return { ...l, animes: [...animes, { id: animeInfo.id, title: animeInfo.title, image: animeInfo.image }] };
+                        } else {
+                          return { ...l, animes: animes.filter(a => a.id !== animeInfo.id) };
+                        }
+                      });
+                      setCustomLists(updated);
+                      setShowListModal(false);
+                      showToast(isAdded ? 'Removido de ' + list.name : 'Guardado en ' + list.name);
+                    }}
+                    style={{ padding: '16px', background: isAdded ? 'rgba(16, 185, 129, 0.1)' : '#1e293b', border: isAdded ? '1px solid #10b981' : '1px solid #334155', borderRadius: '12px', color: 'white', cursor: 'pointer', textAlign: 'left', fontSize: '1.1rem', transition: 'all 0.2s ease' }}
+                    onMouseOver={(e) => !isAdded && (e.currentTarget.style.background = '#334155')}
+                    onMouseOut={(e) => !isAdded && (e.currentTarget.style.background = '#1e293b')}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: isAdded ? '600' : '400', color: isAdded ? '#10b981' : '#f8fafc' }}>{list.name}</span>
+                      {isAdded && <span style={{ fontSize: '0.9rem', background: '#10b981', color: '#000', padding: '2px 10px', borderRadius: '12px', fontWeight: 'bold' }}>✓ Guardado</span>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
