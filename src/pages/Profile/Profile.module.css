@@ -213,6 +213,11 @@
   gap: 1rem;
   border-bottom: 1px solid var(--glass-border);
   margin-bottom: 2rem;
+  position: sticky;
+  top: 60px;
+  z-index: 50;
+  background: var(--bg-dark);
+  padding-top: 0.5rem;
 }
 
 .tabBtn {

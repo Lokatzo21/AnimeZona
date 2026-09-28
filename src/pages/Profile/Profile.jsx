@@ -161,6 +161,55 @@ const Profile = () => {
         </button>
       </div>
 
+      {/* Barra de control de listas: sticky debajo del tab bar, solo visible en tab listas */}
+      {activeTab === 'listas' && (
+        <div style={{
+          position: 'sticky',
+          top: '118px',
+          zIndex: 49,
+          background: 'var(--bg-dark)',
+          paddingBottom: '14px',
+          marginBottom: '8px',
+          borderBottom: '1px solid #1e293b',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>
+              Mis Listas <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>— arrastra para ordenar</span>
+            </h2>
+            <button
+              className={styles.editBtn}
+              style={{ padding: '5px 15px' }}
+              onClick={() => { setShowNewListInput(v => !v); setNewListName(''); }}
+            >
+              {showNewListInput ? '✕ Cancelar' : '+ Crear Lista'}
+            </button>
+          </div>
+          {showNewListInput && (
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                const n = newListName.trim();
+                if (n) {
+                  setCustomLists([...(customLists || []), { id: `list-${Date.now()}`, name: n, animes: [] }]);
+                  setNewListName('');
+                  setShowNewListInput(false);
+                }
+              }}
+              style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
+            >
+              <input
+                autoFocus
+                value={newListName}
+                onChange={e => setNewListName(e.target.value)}
+                placeholder="Nombre de la nueva lista..."
+                style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #334155', background: '#1e293b', color: 'white', fontSize: '1rem' }}
+              />
+              <button type="submit" className={styles.editBtn} style={{ padding: '8px 16px' }}>Crear</button>
+            </form>
+          )}
+        </div>
+      )}
+
       <div className={styles.content}>
         {activeTab === 'historial' && (
           <div>
@@ -218,43 +267,6 @@ const Profile = () => {
 
         {activeTab === 'listas' && (
           <div>
-            {/* Header sticky con título y botón crear */}
-            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-dark, #0f172a)', paddingTop: '10px', paddingBottom: '15px', marginBottom: '20px', borderBottom: '1px solid #1e293b' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Mis Listas <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>— arrastra para ordenar</span></h2>
-                <button
-                  className={styles.editBtn}
-                  style={{ padding: '5px 15px' }}
-                  onClick={() => { setShowNewListInput(v => !v); setNewListName(''); }}
-                >
-                  {showNewListInput ? '✕ Cancelar' : '+ Crear Lista'}
-                </button>
-              </div>
-              {showNewListInput && (
-                <form
-                  onSubmit={e => {
-                    e.preventDefault();
-                    const n = newListName.trim();
-                    if (n) {
-                      setCustomLists([...(customLists || []), { id: `list-${Date.now()}`, name: n, animes: [] }]);
-                      setNewListName('');
-                      setShowNewListInput(false);
-                    }
-                  }}
-                  style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
-                >
-                  <input
-                    autoFocus
-                    value={newListName}
-                    onChange={e => setNewListName(e.target.value)}
-                    placeholder="Nombre de la nueva lista..."
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #334155', background: '#1e293b', color: 'white', fontSize: '1rem' }}
-                  />
-                  <button type="submit" className={styles.editBtn} style={{ padding: '8px 16px' }}>Crear</button>
-                </form>
-              )}
-            </div>
-
             {(customLists || []).length === 0 ? (
               <p className={styles.emptyMsg}>No has creado ninguna lista aún. (Ej: "Isekais", "Por ver")</p>
             ) : (
