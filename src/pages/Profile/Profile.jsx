@@ -15,6 +15,11 @@ const Profile = () => {
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
   const [customLists, setCustomLists] = useLocalStorage('customLists', []);
   const [activeTab, setActiveTab] = useState('historial');
+  const [dragId, setDragId] = useState(null);
+  const [editingListId, setEditingListId] = useState(null);
+  const [editingListName, setEditingListName] = useState('');
+  const [newListName, setNewListName] = useState('');
+  const [showNewListInput, setShowNewListInput] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -213,58 +218,125 @@ const Profile = () => {
 
         {activeTab === 'listas' && (
           <div>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
-              <h2 className={styles.sectionTitle} style={{marginBottom: 0}}>Mis Listas Personales</h2>
-              <button 
-                onClick={() => {
-                  const name = prompt("Nombre de la nueva lista:");
-                  if(name) setCustomLists([...(customLists || []), {id: `list-${Date.now()}`, name, animes: []}]);
-                }}
-                className={styles.editBtn}
-                style={{padding: '5px 15px'}}
-              >
-                + Crear Lista
-              </button>
+            {/* Header sticky con título y botón crear */}
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-dark, #0f172a)', paddingTop: '10px', paddingBottom: '15px', marginBottom: '20px', borderBottom: '1px solid #1e293b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Mis Listas <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>— arrastra para ordenar</span></h2>
+                <button
+                  className={styles.editBtn}
+                  style={{ padding: '5px 15px' }}
+                  onClick={() => { setShowNewListInput(v => !v); setNewListName(''); }}
+                >
+                  {showNewListInput ? '✕ Cancelar' : '+ Crear Lista'}
+                </button>
+              </div>
+              {showNewListInput && (
+                <form
+                  onSubmit={e => {
+                    e.preventDefault();
+                    const n = newListName.trim();
+                    if (n) {
+                      setCustomLists([...(customLists || []), { id: `list-${Date.now()}`, name: n, animes: [] }]);
+                      setNewListName('');
+                      setShowNewListInput(false);
+                    }
+                  }}
+                  style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
+                >
+                  <input
+                    autoFocus
+                    value={newListName}
+                    onChange={e => setNewListName(e.target.value)}
+                    placeholder="Nombre de la nueva lista..."
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #334155', background: '#1e293b', color: 'white', fontSize: '1rem' }}
+                  />
+                  <button type="submit" className={styles.editBtn} style={{ padding: '8px 16px' }}>Crear</button>
+                </form>
+              )}
             </div>
-            
+
             {(customLists || []).length === 0 ? (
               <p className={styles.emptyMsg}>No has creado ninguna lista aún. (Ej: "Isekais", "Por ver")</p>
             ) : (
-              <div style={{display: 'flex', flexDirection: 'column', gap: '30px'}}>
-                {(customLists || []).map(list => (
-                  <div key={list.id} style={{background: '#1e293b', padding: '20px', borderRadius: '10px'}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
-                      <h3 style={{color: 'white', margin: 0, fontSize: '1.2rem'}}>{list.name} <span style={{fontSize:'0.9rem', color:'#94a3b8'}}>({list.animes?.length || 0} animes)</span></h3>
-                      <button 
-                        onClick={() => {
-                          if(confirm(`¿Eliminar la lista "${list.name}"?`)) {
-                            setCustomLists((customLists || []).filter(l => l.id !== list.id));
-                          }
-                        }}
-                        style={{background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer'}}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {(customLists || []).map((list, idx) => (
+                  <div
+                    key={list.id}
+                    draggable
+                    onDragStart={() => setDragId(list.id)}
+                    onDragOver={e => { e.preventDefault(); }}
+                    onDrop={() => {
+                      if (!dragId || dragId === list.id) return;
+                      const from = (customLists || []).findIndex(l => l.id === dragId);
+                      const to = idx;
+                      const reordered = [...(customLists || [])];
+                      const [moved] = reordered.splice(from, 1);
+                      reordered.splice(to, 0, moved);
+                      setCustomLists(reordered);
+                      setDragId(null);
+                    }}
+                    onDragEnd={() => setDragId(null)}
+                    style={{
+                      background: dragId === list.id ? '#0f172a' : '#1e293b',
+                      padding: '20px',
+                      borderRadius: '10px',
+                      border: dragId === list.id ? '2px dashed #6366f1' : '2px solid transparent',
+                      cursor: 'grab',
+                      opacity: dragId === list.id ? 0.5 : 1,
+                      transition: 'opacity 0.2s, border 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', gap: '10px' }}>
+                      {/* Nombre editable */}
+                      {editingListId === list.id ? (
+                        <form
+                          onSubmit={e => {
+                            e.preventDefault();
+                            const n = editingListName.trim();
+                            if (n) setCustomLists((customLists || []).map(l => l.id === list.id ? { ...l, name: n } : l));
+                            setEditingListId(null);
+                          }}
+                          style={{ display: 'flex', gap: '6px', flex: 1 }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <input
+                            autoFocus
+                            value={editingListName}
+                            onChange={e => setEditingListName(e.target.value)}
+                            style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid #6366f1', background: '#0f172a', color: 'white', fontSize: '1rem' }}
+                          />
+                          <button type="submit" style={{ background: '#6366f1', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>✓</button>
+                          <button type="button" onClick={() => setEditingListId(null)} style={{ background: 'transparent', border: '1px solid #334155', color: '#94a3b8', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' }}>✕</button>
+                        </form>
+                      ) : (
+                        <h3
+                          style={{ color: 'white', margin: 0, fontSize: '1.2rem', flex: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                          title="Haz clic para editar el nombre"
+                          onClick={e => { e.stopPropagation(); setEditingListId(list.id); setEditingListName(list.name); }}
+                        >
+                          ☰ {list.name} <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>({list.animes?.length || 0} animes)</span>
+                          <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 400 }}>✎ editar</span>
+                        </h3>
+                      )}
+                      <button
+                        onClick={e => { e.stopPropagation(); if (window.confirm(`¿Eliminar la lista "${list.name}"?`)) setCustomLists((customLists || []).filter(l => l.id !== list.id)); }}
+                        style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', flexShrink: 0 }}
                       >
-                        Eliminar Lista
+                        Eliminar
                       </button>
                     </div>
                     {(!list.animes || list.animes.length === 0) ? (
-                       <p style={{color: '#94a3b8', fontSize: '0.9rem'}}>Lista vacía.</p>
+                      <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Lista vacía.</p>
                     ) : (
                       <div className={styles.grid}>
                         {list.animes.map(anime => (
-                          <div key={`${list.id}-${anime.id}`} style={{position: 'relative'}}>
+                          <div key={`${list.id}-${anime.id}`} style={{ position: 'relative' }}>
                             <AnimeCard anime={anime} />
-                            <button 
-                              onClick={() => {
-                                setCustomLists(customLists.map(l => {
-                                  if(l.id === list.id) return { ...l, animes: l.animes.filter(a => a.id !== anime.id) };
-                                  return l;
-                                }));
-                              }}
-                              style={{position: 'absolute', top: '5px', right: '5px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10}}
+                            <button
+                              onClick={e => { e.stopPropagation(); setCustomLists((customLists || []).map(l => l.id === list.id ? { ...l, animes: l.animes.filter(a => a.id !== anime.id) } : l)); }}
+                              style={{ position: 'absolute', top: '5px', right: '5px', background: 'rgba(239, 68, 68, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10 }}
                               title="Quitar de la lista"
-                            >
-                              X
-                            </button>
+                            >✕</button>
                           </div>
                         ))}
                       </div>
