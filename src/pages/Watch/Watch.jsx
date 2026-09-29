@@ -8,6 +8,23 @@ import styles from './Watch.module.css';
 
 const Watch = () => {
   const { id, episode } = useParams();
+  
+  useEffect(() => {
+    if (!window.chrome || !window.chrome.cast) {
+      const script = document.createElement('script');
+      script.src = "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
+      document.body.appendChild(script);
+
+      window.__onGCastApiAvailable = (isAvailable) => {
+        if (isAvailable && window.cast) {
+          window.cast.framework.CastContext.getInstance().setOptions({
+            receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+            autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+          });
+        }
+      };
+    }
+  }, []);
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -215,15 +232,44 @@ const Watch = () => {
     }
   };
 
-  const handleCast = () => {
-    if (nativeVideoRef.current && nativeVideoRef.current.remote) {
-      nativeVideoRef.current.remote.prompt()
-        .catch(err => {
-          console.error("Error al transmitir", err);
-          alert("Asegúrate de estar en Chrome o Edge y tener tu dispositivo (Samsung TV, Roku) conectado a la misma red Wi-Fi.");
-        });
-    } else {
-      alert("Tu navegador no soporta Google Cast o no tienes un dispositivo compatible cercano.");
+  const handleCast = async () => {
+    try {
+      if (window.cast && window.cast.framework) {
+        const castContext = window.cast.framework.CastContext.getInstance();
+        try {
+          await castContext.requestSession();
+          const session = castContext.getCurrentSession();
+          if (session) {
+            const url = resolvedFbUrl || activeServer?.url;
+            if (url) {
+                const mediaInfo = new window.chrome.cast.media.MediaInfo(url, 'video/mp4');
+                const request = new window.chrome.cast.media.LoadRequest(mediaInfo);
+                request.currentTime = nativeVideoRef.current ? nativeVideoRef.current.currentTime : 0;
+                
+                await session.loadMedia(request);
+                // alert("Transmitiendo a TV con éxito."); // omit to be less annoying
+                if (nativeVideoRef.current) nativeVideoRef.current.pause();
+                return;
+            }
+          }
+        } catch (err) {
+          console.warn("Cast SDK fallback...", err);
+        }
+      }
+
+      if (nativeVideoRef.current && nativeVideoRef.current.remote && nativeVideoRef.current.remote.prompt) {
+        try {
+          await nativeVideoRef.current.remote.prompt();
+          return;
+        } catch (err) {
+          console.warn("remote.prompt fallback", err);
+        }
+      }
+
+      alert("No se pudo iniciar automáticamente. En PC: Haz clic en el menú de 3 puntos del navegador (arriba a la derecha) y elige 'Transmitir'. En móvil: Usa el botón nativo del reproductor o asegúrate de estar en la misma red Wi-Fi que tu TV.");
+    } catch (error) {
+      console.error(error);
+      alert("Error al intentar transmitir.");
     }
   };
 
