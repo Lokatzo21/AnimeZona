@@ -295,7 +295,7 @@ export const api = {
         }
       } catch (e) { console.error("Error al consultar Supabase episodios", e); }
 
-      let finalEpisodes = allEpisodes;
+            let finalEpisodes = allEpisodes;
       if (allEpisodes.length > 0) {
         finalEpisodes = allEpisodes.map((ep, index) => {
           // Intentar obtener el nombre y temporada desde TMDB local o la base de datos
@@ -325,65 +325,7 @@ export const api = {
           }
       }
 
-      // Parche específico para Frieren (ID 209867) debido al desfase del Especial en sitios de Anime vs TMDB
-      if (String(info.id) === '209867') {
-         const newFrierenEps = [];
-         
-         // Episodios 1 a 28 (Temporada 1 real)
-         for (let i = 0; i < 28; i++) {
-             if (finalEpisodes[i]) {
-                 finalEpisodes[i].season = 1;
-                 newFrierenEps.push(finalEpisodes[i]);
-             }
-         }
-         
-         // Episodio 29 (Especial - Temporada 1)
-         const dbEp29 = (dbEps && dbEps.find(e => e.episode_number === 29)) || {};
-         newFrierenEps.push({
-             id: 29,
-             tmdb_episode_id: 29,
-             title: dbEp29.episode_name || 'Marumaru no Mahou - Extra',
-             url: 29,
-             season: 1
-         });
-         
-         // Episodios 30+ (Temporada 2, mapeados a los episodios 29+ de TMDB)
-         // TMDB devuelve 38 episodios, por lo que el índice 28 es el Ep 29 de TMDB.
-         for (let i = 28; i < allEpisodes.length; i++) {
-             const ep = allEpisodes[i]; 
-             const newAbsoluteNum = ep.url + 1; // Desfasar por 1
-             const dbEpInfo = (dbEps && dbEps.find(e => e.episode_number === newAbsoluteNum)) || {};
-             
-             let epName = ep.title;
-             if (epName.includes(' - ')) {
-                 epName = epName.split(' - ').slice(1).join(' - ');
-             }
-             
-             newFrierenEps.push({
-                 id: newAbsoluteNum,
-                 tmdb_episode_id: ep.id,
-                 title: dbEpInfo.episode_name || `T2E${newAbsoluteNum - 29} - ${epName}`,
-                 url: newAbsoluteNum,
-                 season: dbEpInfo.season_number || 2
-             });
-         }
-         
-         // Agregar episodios adicionales scrapeados manualmente (ej. si dbMaxEpisode > 39)
-         if (dbMaxEpisode > newFrierenEps.length) {
-             for (let i = newFrierenEps.length + 1; i <= dbMaxEpisode; i++) {
-                 const dbEpInfo = (dbEps && dbEps.find(e => e.episode_number === i)) || {};
-                 newFrierenEps.push({
-                     id: i,
-                     tmdb_episode_id: i,
-                     title: dbEpInfo.episode_name || `Episodio ${i}`,
-                     url: i,
-                     season: dbEpInfo.season_number || 2
-                 });
-             }
-         }
-         
-         finalEpisodes = newFrierenEps;
-      }
+      
 
       if (finalEpisodes.length > 0) return finalEpisodes;
       

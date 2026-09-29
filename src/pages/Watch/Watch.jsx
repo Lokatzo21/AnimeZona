@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -93,7 +93,7 @@ const Watch = () => {
 
     const success = await api.updateEpisodeTimes(id, episode, times);
     if (success) {
-      alert("Â¡Tiempos guardados exitosamente! ðŸš€");
+      alert("¡Tiempos guardados exitosamente! 🚀");
       // Update local state to reflect changes instantly without reload
       setActiveServer(prev => ({
         ...prev,
@@ -155,10 +155,10 @@ const Watch = () => {
       setQualityChangeTime(null);
       return;
     }
-    if (promptShownForEp) return; // Ya se le preguntÃ³ para este episodio
+    if (promptShownForEp) return; // Ya se le preguntó para este episodio
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
-    if (progress && progress > 5) { // Si vio mÃ¡s de 5 segundos
+    if (progress && progress > 5) { // Si vio más de 5 segundos
       setSavedTime(progress);
       setShowResumePrompt(true);
       setPromptShownForEp(true);
@@ -168,7 +168,7 @@ const Watch = () => {
     }
   };
 
-  // Efecto para capturar el progreso si la sincronizaciÃ³n de Supabase llega tarde
+  // Efecto para capturar el progreso si la sincronización de Supabase llega tarde
   useEffect(() => {
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
@@ -193,7 +193,7 @@ const Watch = () => {
       }
     }
 
-    // Verificar si empezÃ³ el outro (para Siguiente Episodio)
+    // Verificar si empezó el outro (para Siguiente Episodio)
     if (activeServer?.outro_start && currentTime >= activeServer.outro_start) {
       setShowNextEpisode(true);
     } else {
@@ -223,7 +223,7 @@ const Watch = () => {
       nativeVideoRef.current.remote.prompt()
         .catch(err => {
           console.error("Error al transmitir", err);
-          alert("AsegÃºrate de estar en Chrome o Edge y tener tu dispositivo (Samsung TV, Roku) conectado a la misma red Wi-Fi.");
+          alert("Asegúrate de estar en Chrome o Edge y tener tu dispositivo (Samsung TV, Roku) conectado a la misma red Wi-Fi.");
         });
     } else {
       alert("Tu navegador no soporta Google Cast o no tienes un dispositivo compatible cercano.");
@@ -280,8 +280,8 @@ const Watch = () => {
         const rect = videoContainerRef.current.getBoundingClientRect();
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         
-        // Ajuste fino para centrar: tiene en cuenta el tamaÃ±o de la ventana y un offset para el header
-        const navbarOffset = 80; // Ajusta este valor si el navbar es mÃ¡s grande/pequeÃ±o
+        // Ajuste fino para centrar: tiene en cuenta el tamaño de la ventana y un offset para el header
+        const navbarOffset = 80; // Ajusta este valor si el navbar es más grande/pequeño
         const targetY = scrollTop + rect.top + (rect.height / 2) - (window.innerHeight / 2) - (navbarOffset / 2);
         
         window.scrollTo({
@@ -399,7 +399,7 @@ const Watch = () => {
           setContinueWatching(updateContinueWatching);
         }
 
-        // Marcar como visto automÃ¡ticamente
+        // Marcar como visto automáticamente
         setWatchedEpisodes(prev => {
           const currentList = prev || [];
           const epStr = `${animeInfo.id}-${episode}`;
@@ -458,7 +458,7 @@ const Watch = () => {
       currentEpTitle = `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
   }
 
-  // Filtrar servidores a mostrar segÃºn el idioma seleccionado
+  // Filtrar servidores a mostrar según el idioma seleccionado
   const PRIORITY_ORDER = ['ZONAAPS', 'CINEBEL', 'ARCHIVE', 'MULTI - AUDIO Z'];
   const visibleServers = servers
     .filter(s => s.lang === language || s.lang === 'none')
@@ -489,7 +489,7 @@ const Watch = () => {
                       className={`${styles.langBtn} ${language === 'latino' ? styles.langActive : ''}`} 
                       onClick={() => handleLanguageChange('latino')}
                     >
-                      EspaÃ±ol Latino
+                      Latino
                     </button>
                 )}
                 {availableLanguages.includes('sub') && (
@@ -627,7 +627,7 @@ const Watch = () => {
                   ) : activeServer?.name?.includes('(Descarga)') ? (
                     <div className={styles.downloadContainer} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#1e293b', color: 'white'}}>
                         <h3 style={{fontSize: '1.5rem', marginBottom: '1rem'}}>Enlace de Descarga</h3>
-                        <p style={{marginBottom: '1.5rem', color: '#94a3b8'}}>Este servidor es para descargar el episodio, no para reproducirlo aquÃ­.</p>
+                        <p style={{marginBottom: '1.5rem', color: '#94a3b8'}}>Este servidor es para descargar el episodio, no para reproducirlo aquí.</p>
                         <a href={activeServer.url} target="_blank" rel="noopener noreferrer" style={{background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold'}}>
                             Ir a Descargar
                         </a>
@@ -701,7 +701,7 @@ const Watch = () => {
             {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
               <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-dark-secondary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid #ef4444' }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#f8fafc', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>âš™ï¸</span> Panel de Control Admin - Tiempos
+                  <span>⚙️</span> Panel de Control Admin - Tiempos
                 </h4>
                 <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <label style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', color: '#94a3b8' }}>
@@ -725,7 +725,7 @@ const Watch = () => {
                     />
                   </label>
                   <label style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', color: '#94a3b8' }}>
-                    BotÃ³n Sig. Episodio
+                    Botón Sig. Episodio
                     <input 
                       type="text" 
                       placeholder="Ej. 22:15" 
@@ -741,7 +741,7 @@ const Watch = () => {
                     Guardar Tiempos
                   </button>
                 </div>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '10px 0 0 0' }}>Formato vÃ¡lido: MM:SS (Ej: 1:30) o Segundos (Ej: 90).</p>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '10px 0 0 0' }}>Formato válido: MM:SS (Ej: 1:30) o Segundos (Ej: 90).</p>
               </div>
             )}
 
