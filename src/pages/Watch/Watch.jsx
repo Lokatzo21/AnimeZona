@@ -158,12 +158,14 @@ const Watch = () => {
     if (promptShownForEp) return; // Ya se le preguntó para este episodio
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
-    if (progress && progress > 5) { // Si vio más de 5 segundos
-      setSavedTime(progress);
-      setShowResumePrompt(true);
-      setPromptShownForEp(true);
-      if (nativeVideoRef.current) {
-         nativeVideoRef.current.pause();
+    if (progress && progress > 5) {
+      if (nativeVideoRef.current && nativeVideoRef.current.currentTime < 5) {
+        setSavedTime(progress);
+        setShowResumePrompt(true);
+        setPromptShownForEp(true);
+        nativeVideoRef.current.pause();
+      } else {
+        setPromptShownForEp(true);
       }
     }
   };
@@ -172,12 +174,7 @@ const Watch = () => {
   useEffect(() => {
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
-    if (progress && progress > 5 && !promptShownForEp && nativeVideoRef.current && nativeVideoRef.current.readyState >= 1) {
-      setSavedTime(progress);
-      setShowResumePrompt(true);
-      setPromptShownForEp(true);
-      nativeVideoRef.current.pause();
-    }
+    if (progress && progress > 5 && !promptShownForEp && nativeVideoRef.current && nativeVideoRef.current.readyState >= 1) { if (nativeVideoRef.current.currentTime < 5) { setSavedTime(progress); setShowResumePrompt(true); setPromptShownForEp(true); nativeVideoRef.current.pause(); } else { setPromptShownForEp(true); } }
   }, [videoProgress, episode, id, promptShownForEp]);
 
   const handleTimeUpdate = () => {
