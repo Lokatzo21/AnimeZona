@@ -266,10 +266,8 @@ export const api = {
                  
                  // Construimos el titulo para que los componentes React (Watch.jsx / AnimeDetails.jsx) 
                  // que le añaden "T2E1 - " al inicio, terminen mostrando "T2E1 - (24) Redención"
-                 const isMentalista = customData.title.toLowerCase().includes('mentalista');
-                 const titleStr = isMentalista 
-                     ? (ep.episode_name || 'Episodio ' + ep.episode_number)
-                     : `(${ep.episode_number}) ${ep.episode_name || 'Episodio ' + ep.episode_number}`;
+                 // Devolvemos el nombre limpio. La interfaz (Watch.jsx/AnimeDetails.jsx) le agregar Automticamente el T1E1 - 
+                 const titleStr = ep.episode_name || 'Episodio ' + ep.episode_number;
 
                  return {
                      id: ep.episode_number,
