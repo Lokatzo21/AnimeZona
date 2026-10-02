@@ -538,6 +538,77 @@ const Admin = () => {
     }));
   };
 
+  const handleDeleteEpisode = (absNumToDelete) => {
+    const total = parseInt(animeForm.total_episodes, 10) || 0;
+    if (total <= 1) {
+      alert("No puedes eliminar el único episodio de la serie.");
+      return;
+    }
+    
+    const newEpisodeNames = {};
+    let newAbs = 1;
+    const seasonCounters = {};
+
+    for (let i = 1; i <= total; i++) {
+      if (i === absNumToDelete) continue; // Lo saltamos
+      
+      const epData = getEpisodeData(i);
+      const s = epData.season || 1;
+      seasonCounters[s] = (seasonCounters[s] || 0) + 1;
+      
+      newEpisodeNames[newAbs] = {
+        name: epData.name,
+        season: s,
+        episode: seasonCounters[s] // Recalculamos el número relativo de la temporada para evitar saltos
+      };
+      newAbs++;
+    }
+
+    setAnimeForm(prev => ({ ...prev, total_episodes: newAbs - 1 }));
+    setEpisodeNames(newEpisodeNames);
+  };
+
+  const handleDeleteSeason = (seasonToDelete) => {
+    if (seasonToDelete === 'all') return;
+    
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar TODOS los episodios de la Temporada ${seasonToDelete}?`)) {
+      return;
+    }
+
+    const total = parseInt(animeForm.total_episodes, 10) || 0;
+    const newEpisodeNames = {};
+    let newAbs = 1;
+    const seasonCounters = {};
+    let removedCount = 0;
+
+    for (let i = 1; i <= total; i++) {
+      const epData = getEpisodeData(i);
+      if (epData.season === seasonToDelete) {
+        removedCount++;
+        continue; // Saltamos toda la temporada
+      }
+      
+      const s = epData.season || 1;
+      seasonCounters[s] = (seasonCounters[s] || 0) + 1;
+      
+      newEpisodeNames[newAbs] = {
+        name: epData.name,
+        season: s,
+        episode: seasonCounters[s]
+      };
+      newAbs++;
+    }
+
+    if (removedCount === total) {
+      alert("No puedes eliminar la única temporada existente. Añade otra primero.");
+      return;
+    }
+
+    setAnimeForm(prev => ({ ...prev, total_episodes: newAbs - 1 }));
+    setEpisodeNames(newEpisodeNames);
+    setSelectedSeasonTab('all');
+  };
+
   const handleEpisodeNameChange = (epNumber, name) => {
     setEpisodeNames(prev => ({
       ...prev,
@@ -1053,9 +1124,19 @@ const Admin = () => {
                             <span style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.85rem' }}>
                               T{ep.season}E{ep.episode}
                             </span>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              #{ep.absNum}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                #{ep.absNum}
+                              </span>
+                              <button 
+                                type="button" 
+                                onClick={() => handleDeleteEpisode(ep.absNum)}
+                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center' }}
+                                title="Eliminar episodio"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
 
                           <input 
@@ -1109,6 +1190,28 @@ const Admin = () => {
                       >
                         <Plus size={16} /> Añadir Episodio a {selectedSeasonTab === 'all' ? 'Temporada 1' : `Temporada ${selectedSeasonTab}`}
                       </button>
+                      
+                      {selectedSeasonTab !== 'all' && (
+                        <button 
+                          type="button" 
+                          onClick={() => handleDeleteSeason(selectedSeasonTab)}
+                          style={{ 
+                            background: '#1e293b', 
+                            color: '#ef4444', 
+                            border: '1px dashed #ef4444', 
+                            padding: '0.5rem 1rem', 
+                            borderRadius: '0.5rem', 
+                            cursor: 'pointer', 
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            marginLeft: 'auto'
+                          }}
+                        >
+                          <Trash2 size={16} /> Eliminar Temporada {selectedSeasonTab}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
