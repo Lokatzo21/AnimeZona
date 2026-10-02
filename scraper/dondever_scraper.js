@@ -259,81 +259,95 @@ async function runScraper() {
 
             // ----- NUEVO: DETECCIÓN DE REPRODUCTOR MULTI-SERVIDOR INTERNO (finalizePlayer) -----
             let multiServerFound = false;
-            console.log(`[🤖] Buscando reproductores internos multi-servidor (StreamWish, FileLions)...`);
+            console.log(`[🤖] Esperando a que el reproductor cargue (puede tardar unos segundos)...`);
             
-            for (const frame of page.frames()) {
-                try {
-                    const content = await frame.content();
-                    const match = content.match(/finalizePlayer\s*\(\s*(\{.*?\})\s*\)/);
-                    if (match && match[1]) {
-                        const jsonData = JSON.parse(match[1]);
-                        
-                        const processLangServers = async (langObj, langName) => {
-                            if (!langObj) return;
-                            let filelionsCount = 0;
-                            let streamwishCount = 0;
-                            for (const [srvKey, srvUrl] of Object.entries(langObj)) {
-                                const keyUpper = srvKey.toUpperCase();
-                                if (keyUpper.includes('STREAMWISH') || keyUpper.includes('FILELIONS')) {
-                                    multiServerFound = true;
-                                    
-                                    let displayName = keyUpper.includes('STREAMWISH') ? 'STREAMWISH' : 'FILELIONS';
-                                    if (keyUpper.includes('FILELIONS')) {
-                                        filelionsCount++;
-                                        if (filelionsCount > 1) {
-                                            displayName = `FILELIONS ${filelionsCount}`;
-                                        }
-                                    }
-                                    if (keyUpper.includes('STREAMWISH')) {
-                                        streamwishCount++;
-                                        if (streamwishCount > 1) {
-                                            displayName = `STREAMWISH ${streamwishCount}`;
-                                        }
-                                    }
-                                    
-                                    console.log(`[✅] Servidor interno detectado: ${displayName} -> ${srvUrl}`);
-                                    
-                                    try {
-                                        const check = await client.query(
-                                            `SELECT id FROM anime_episodes WHERE search_title=$1 AND episode_number=$2 AND season_number=$3 AND server_name=$4`,
-                                            [seriesTitle.toLowerCase(), currentEpNumToSave, epData.season, displayName]
-                                        );
-                                        
-                                        if (check.rows.length === 0) {
-                                            await client.query(`
-                                                INSERT INTO anime_episodes (search_title, episode_number, season_number, episode_name, server_name, language, video_url, anime_tmdb_id)
-                                                VALUES ($1, $2, $3, $4, $5, $6, $7, null)
-                                            `, [
-                                                seriesTitle.toLowerCase(), 
-                                                currentEpNumToSave, 
-                                                epData.season, 
-                                                epData.title, 
-                                                displayName, 
-                                                langName, 
-                                                srvUrl
-                                            ]);
-                                            console.log(`[🎉] Guardado en BD con éxito (${displayName}).`);
-                                        } else {
-                                            console.log(`[⏭️] Ya existe en la base de datos, saltando (${displayName}).`);
-                                        }
-                                    } catch(err) {
-                                        console.error(`[❌] Error SQL:`, err.message);
-                                    }
+            let jsonDataToProcess = null;
+            
+            // Polling loop: intentamos hasta 20 veces (1 segundo de pausa)
+            for (let attempt = 1; attempt <= 20; attempt++) {
+                for (const frame of page.frames()) {
+                    try {
+                        const content = await frame.content();
+                        const match = content.match(/finalizePlayer\s*\(\s*(\{.*?\})\s*\)/);
+                        if (match && match[1]) {
+                            jsonDataToProcess = JSON.parse(match[1]);
+                            break;
+                        }
+                    } catch(e) {
+                        // Ignorar errores de acceso cruzado a iframes
+                    }
+                }
+                
+                if (jsonDataToProcess) {
+                    console.log(`[🤖] Reproductor interno detectado rápidamente en el intento ${attempt}.`);
+                    break;
+                }
+                
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            
+            if (jsonDataToProcess) {
+                const processLangServers = async (langObj, langName) => {
+                    if (!langObj) return;
+                    let filelionsCount = 0;
+                    let streamwishCount = 0;
+                    for (const [srvKey, srvUrl] of Object.entries(langObj)) {
+                        const keyUpper = srvKey.toUpperCase();
+                        if (keyUpper.includes('STREAMWISH') || keyUpper.includes('FILELIONS')) {
+                            multiServerFound = true;
+                            
+                            let displayName = keyUpper.includes('STREAMWISH') ? 'STREAMWISH' : 'FILELIONS';
+                            if (keyUpper.includes('FILELIONS')) {
+                                filelionsCount++;
+                                if (filelionsCount > 1) {
+                                    displayName = `FILELIONS ${filelionsCount}`;
                                 }
                             }
-                        };
-                        
-                        // Procesamos los servidores del JSON en orden de preferencia de idioma
-                        if (jsonData.latino) {
-                            await processLangServers(jsonData.latino, "latino");
-                        } else if (jsonData.subtitulado) {
-                            await processLangServers(jsonData.subtitulado, "subtitulado");
-                        } else if (jsonData.castellano) {
-                            await processLangServers(jsonData.castellano, "castellano");
+                            if (keyUpper.includes('STREAMWISH')) {
+                                streamwishCount++;
+                                if (streamwishCount > 1) {
+                                    displayName = `STREAMWISH ${streamwishCount}`;
+                                }
+                            }
+                            
+                            console.log(`[✅] Servidor interno detectado: ${displayName} -> ${srvUrl}`);
+                            
+                            try {
+                                const check = await client.query(
+                                    `SELECT id FROM anime_episodes WHERE search_title=$1 AND episode_number=$2 AND season_number=$3 AND server_name=$4`,
+                                    [seriesTitle.toLowerCase(), currentEpNumToSave, epData.season, displayName]
+                                );
+                                
+                                if (check.rows.length === 0) {
+                                    await client.query(`
+                                        INSERT INTO anime_episodes (search_title, episode_number, season_number, episode_name, server_name, language, video_url, anime_tmdb_id)
+                                        VALUES ($1, $2, $3, $4, $5, $6, $7, null)
+                                    `, [
+                                        seriesTitle.toLowerCase(), 
+                                        currentEpNumToSave, 
+                                        epData.season, 
+                                        epData.title, 
+                                        displayName, 
+                                        langName, 
+                                        srvUrl
+                                    ]);
+                                    console.log(`[🎉] Guardado en BD con éxito (${displayName}).`);
+                                } else {
+                                    console.log(`[⏭️] Ya existe en la base de datos, saltando (${displayName}).`);
+                                }
+                            } catch(err) {
+                                console.error(`[❌] Error SQL:`, err.message);
+                            }
                         }
                     }
-                } catch(e) {
-                    // Ignorar errores de acceso al iframe cruzado si los hay
+                };
+                
+                if (jsonDataToProcess.latino) {
+                    await processLangServers(jsonDataToProcess.latino, 'latino');
+                } else if (jsonDataToProcess.subtitulado) {
+                    await processLangServers(jsonDataToProcess.subtitulado, 'subtitulado');
+                } else if (jsonDataToProcess.castellano) {
+                    await processLangServers(jsonDataToProcess.castellano, 'castellano');
                 }
             }
             
