@@ -317,29 +317,6 @@ async function runScraper() {
                 }
                 
                 await new Promise(r => setTimeout(r, 1000));
-                                for (const frame of newTab.frames()) {
-                                    try {
-                                        const content = await frame.content();
-                                        const match = content.match(/finalizePlayer\s*\(\s*(\{.*?\})\s*\)/);
-                                        if (match && match[1]) {
-                                            jsonDataToProcess = JSON.parse(match[1]);
-                                            break;
-                                        }
-                                    } catch(e) {}
-                                }
-                                if (jsonDataToProcess) break;
-                            }
-                            await newTab.close();
-                        } catch(e) {
-                            if (newTab) try { await newTab.close(); } catch(err){}
-                        }
-                    }
-                    if (jsonDataToProcess) {
-                        console.log(`[🤖] ¡Éxito! Conexión lograda desde la pestaña nueva.`);
-                        break;
-                    }
-                }
-                
                 await new Promise(r => setTimeout(r, 1000));
             }
             
