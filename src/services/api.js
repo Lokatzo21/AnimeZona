@@ -264,10 +264,21 @@ export const api = {
              return uniqueEps.map((ep) => {
                  const s = ep.season_number || 1;
                  
-                 // Construimos el titulo para que los componentes React (Watch.jsx / AnimeDetails.jsx) 
-                 // que le añaden "T2E1 - " al inicio, terminen mostrando "T2E1 - (24) Redención"
-                 // Devolvemos el nombre limpio. La interfaz (Watch.jsx/AnimeDetails.jsx) le agregar Automticamente el T1E1 - 
-                 const titleStr = ep.episode_name || 'Episodio ' + ep.episode_number;
+                 // Si el nombre en la BD es genrico (como "Episodio 1") pero el usuario carg nombres reales en custom_animes, usamos el nombre real
+                 let customName = null;
+                 const customEp = customData.episode_names?.[ep.episode_number] || customData.episode_names?.[String(ep.episode_number)];
+                 if (customEp && typeof customEp === 'object') {
+                    customName = customEp.name || customEp.title;
+                 } else if (typeof customEp === 'string' && customEp.trim()) {
+                    customName = customEp.replace(/^T\d+E\d+\s*[-:]*\s*/i, '');
+                 }
+
+                 let finalName = ep.episode_name;
+                 if (!finalName || finalName.match(/^Episodio\s+\d+$/i)) {
+                    finalName = customName || finalName || ('Episodio ' + ep.episode_number);
+                 }
+
+                 const titleStr = finalName;
 
                  return {
                      id: ep.episode_number,
@@ -279,16 +290,34 @@ export const api = {
              });
          }
 
-         const total = customData.total_episodes || 12;
          const names = customData.episode_names || {};
-         return Array.from({ length: total }, (_, i) => ({
-           id: i + 1,
-           tmdb_episode_id: i + 1,
-           title: names[i + 1] || `T1E${i + 1}`,
-           url: i + 1,
-           season: 1,
-           absolute_id: i + 1
-         }));
+         const total = customData.total_episodes || Math.max(Object.keys(names).length, 12);
+         return Array.from({ length: total }, (_, i) => {
+           const epNum = i + 1;
+           const epVal = names[epNum] || names[String(epNum)];
+           let epSeason = 1;
+           let epTitle = `T1E${epNum}`;
+
+           if (epVal && typeof epVal === 'object') {
+             epSeason = Number(epVal.season) || 1;
+             epTitle = epVal.name || epVal.title || `T${epSeason}E${epVal.episode || epNum}`;
+           } else if (typeof epVal === 'string' && epVal.trim()) {
+             epTitle = epVal;
+             const match = epVal.match(/^T(\d+)E/i) || epVal.match(/^Temporada\s*(\d+)/i);
+             if (match) {
+               epSeason = parseInt(match[1], 10);
+             }
+           }
+
+           return {
+             id: epNum,
+             tmdb_episode_id: epNum,
+             title: epTitle,
+             url: epNum,
+             season: epSeason,
+             absolute_id: epNum
+           };
+         });
       }
 
       const info = await api.getAnimeInfo(id);

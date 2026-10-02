@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ShieldAlert, Users, PlusCircle, CheckCircle, Database, ListVideo, Film, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Users, PlusCircle, CheckCircle, Database, ListVideo, Film, ChevronRight, Upload, FileText, Sparkles, Layers, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { api, TMDB_GENRES } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import styles from './Admin.module.css';
@@ -44,6 +44,12 @@ const Admin = () => {
   const [episodeNames, setEpisodeNames] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Bulk Episodes Importer State
+  const [isImporterOpen, setIsImporterOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [importStats, setImportStats] = useState(null);
+  const [selectedSeasonTab, setSelectedSeasonTab] = useState('all');
 
   // Scraper V3 State
   const [scraperForm, setScraperForm] = useState({ title: '', alt_title: '', tmdb_id: '', provider: 'both', startEpisode: 1 });
@@ -347,6 +353,189 @@ const Admin = () => {
       }
       return { ...prev, genres: [...prev.genres, genre] };
     });
+  };
+
+  // --- PARSER DE EPISODIOS Y TEMPORADAS ---
+  const parseEpisodesText = (rawText) => {
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let currentSeason = 1;
+    let parsedEpisodes = [];
+    let detectedTitle = null;
+    let seasonCounts = {};
+
+    for (const line of lines) {
+      // 1. Detectar título si viene indicado: "Serie: El Mentalista"
+      const titleMatch = line.match(/^(?:serie|titulo|title|show|anime)\s*:\s*(.+)$/i);
+      if (titleMatch) {
+        detectedTitle = titleMatch[1].trim();
+        continue;
+      }
+
+      // 2. Detectar encabezado de temporada: "TEMPORADA 1", "Season 2", "T3", etc.
+      const seasonMatch = line.match(/^(?:temporada|season|temp|t)\s*(\d+)[:\s-]*(.*)$/i);
+      if (seasonMatch) {
+        currentSeason = parseInt(seasonMatch[1], 10);
+        continue;
+      }
+
+      // 3. Detectar línea de episodio
+      let epMatch = line.match(/^(?:episodio|capitulo|cap|ep|episode)\s*(\d+)(?:\s*\(\d+\))?\s*[-:.)]?\s*(.*)$/i);
+      let epName = '';
+
+      if (epMatch) {
+        epName = epMatch[2].trim();
+      } else {
+        const numMatch = line.match(/^(\d+)[\s.:)-]+\s*(.*)$/);
+        if (numMatch) {
+          epName = numMatch[2].trim();
+        } else {
+          epName = line;
+        }
+      }
+
+      // Limpiar números absolutos en paréntesis como "(24) - Redención" o "(24) Redención"
+      epName = epName.replace(/^\(\d+\)\s*[-:]*\s*/, '').trim();
+
+      seasonCounts[currentSeason] = (seasonCounts[currentSeason] || 0) + 1;
+      const seasonEpNum = seasonCounts[currentSeason];
+
+      parsedEpisodes.push({
+        season: currentSeason,
+        episode: seasonEpNum,
+        name: epName || (`Episodio ${seasonEpNum}`)
+      });
+    }
+
+    return { 
+      detectedTitle, 
+      parsedEpisodes, 
+      seasons: Object.keys(seasonCounts).map(Number).sort((a,b)=>a-b) 
+    };
+  };
+
+  const handleProcessBulkText = () => {
+    if (!bulkText.trim()) return;
+    const { detectedTitle, parsedEpisodes, seasons } = parseEpisodesText(bulkText);
+    if (parsedEpisodes.length === 0) {
+      alert('No se detectaron episodios en el texto.');
+      return;
+    }
+
+    // Actualizar animeForm automáticamente
+    setAnimeForm(prev => ({
+      ...prev,
+      title: (!prev.title && detectedTitle) ? detectedTitle : prev.title,
+      total_episodes: parsedEpisodes.length
+    }));
+
+    // Construir nuevo mapa de episodios
+    const newEpisodeNames = {};
+    parsedEpisodes.forEach((ep, idx) => {
+      newEpisodeNames[idx + 1] = {
+        name: ep.name,
+        season: ep.season,
+        episode: ep.episode
+      };
+    });
+
+    setEpisodeNames(newEpisodeNames);
+    setImportStats({
+      total: parsedEpisodes.length,
+      seasons: seasons.length || 1,
+      seasonList: seasons
+    });
+    if (seasons.length > 0) {
+      setSelectedSeasonTab(seasons[0]);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target.result;
+      setBulkText(content);
+    };
+    reader.readAsText(file);
+  };
+
+  const getEpisodeData = (epNumber) => {
+    const val = episodeNames[epNumber] || episodeNames[String(epNumber)];
+    if (!val) {
+      return { name: '', season: 1, episode: epNumber };
+    }
+    if (typeof val === 'object') {
+      return {
+        name: val.name || val.title || '',
+        season: Number(val.season) || 1,
+        episode: Number(val.episode) || epNumber
+      };
+    }
+    const match = String(val).match(/^T(\d+)E(\d+)\s*[-:]*\s*(.*)$/i);
+    if (match) {
+      return {
+        name: match[3] || '',
+        season: parseInt(match[1], 10),
+        episode: parseInt(match[2], 10)
+      };
+    }
+    return {
+      name: String(val).replace(/^T\d+E\d+\s*[-:]*\s*/i, ''),
+      season: 1,
+      episode: epNumber
+    };
+  };
+
+  const handleEpisodeFieldChange = (epNumber, field, value) => {
+    setEpisodeNames(prev => {
+      const current = getEpisodeData(epNumber);
+      return {
+        ...prev,
+        [epNumber]: {
+          ...current,
+          [field]: (field === 'season' || field === 'episode') ? (parseInt(value, 10) || 1) : value
+        }
+      };
+    });
+  };
+
+  const handleAddSeason = () => {
+    const total = parseInt(animeForm.total_episodes, 10) || 0;
+    const allEpNumbers = Array.from({ length: total }, (_, i) => i + 1);
+    let maxSeason = 1;
+    allEpNumbers.forEach(n => {
+      const d = getEpisodeData(n);
+      if (d.season > maxSeason) maxSeason = d.season;
+    });
+    const nextSeason = maxSeason + 1;
+    const nextAbs = total + 1;
+
+    setAnimeForm(prev => ({ ...prev, total_episodes: nextAbs }));
+    setEpisodeNames(prev => ({
+      ...prev,
+      [nextAbs]: { name: '', season: nextSeason, episode: 1 }
+    }));
+    setSelectedSeasonTab(nextSeason);
+  };
+
+  const handleAddEpisodeToSeason = (seasonNum) => {
+    const s = seasonNum === 'all' ? 1 : Number(seasonNum);
+    const total = parseInt(animeForm.total_episodes, 10) || 0;
+    const allEpNumbers = Array.from({ length: total }, (_, i) => i + 1);
+    
+    let countInSeason = 0;
+    allEpNumbers.forEach(n => {
+      const d = getEpisodeData(n);
+      if (d.season === s) countInSeason++;
+    });
+
+    const nextAbs = total + 1;
+    setAnimeForm(prev => ({ ...prev, total_episodes: nextAbs }));
+    setEpisodeNames(prev => ({
+      ...prev,
+      [nextAbs]: { name: '', season: s, episode: countInSeason + 1 }
+    }));
   };
 
   const handleEpisodeNameChange = (epNumber, name) => {
@@ -734,23 +923,196 @@ const Admin = () => {
               </label>
             </div>
 
-            <div className={styles.formGroup}>
-              <label style={{ marginTop: '2rem', borderTop: '1px solid #333', paddingTop: '1rem' }}>Nombres de Episodios (Opcional)</label>
-              <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Si los dejas en blanco, se llamarán automáticamente "T1E1", "T1E2", etc.</p>
-              <div className={styles.episodesGrid}>
-                {Array.from({ length: animeForm.total_episodes || 0 }).map((_, i) => (
-                  <div key={i} className={styles.episodeInput}>
-                    <span>Episodio {i + 1}</span>
-                    <input 
-                      type="text" 
-                      className={styles.input} 
-                      placeholder={`T1E${i + 1} - ...`} 
-                      value={episodeNames[i + 1] !== undefined ? episodeNames[i + 1] : `T1E${i + 1} - `}
-                      onChange={(e) => handleEpisodeNameChange(i + 1, e.target.value)}
-                    />
-                  </div>
-                ))}
+            <div className={styles.formGroup} style={{ marginTop: '2rem', borderTop: '1px solid #334155', paddingTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Layers size={20} color="#38bdf8" /> Gestión de Temporadas y Episodios
+                  </label>
+                  <p style={{ color: '#94a3af', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+                    Organiza por temporadas o importa tus listas completas desde texto o archivo .txt
+                  </p>
+                </div>
+
+                <button 
+                  type="button" 
+                  className={styles.importBtn} 
+                  onClick={() => setIsImporterOpen(!isImporterOpen)}
+                >
+                  <FileText size={16} /> 
+                  {isImporterOpen ? 'Cerrar Importador' : 'Importar Lista o .TXT'}
+                  {isImporterOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
               </div>
+
+              {/* PANEL DE IMPORTACIÓN DESDE TEXTO O .TXT */}
+              {isImporterOpen && (
+                <div className={styles.importerCard}>
+                  <div className={styles.importerHeader}>
+                    <h4><Sparkles size={18} /> Autocompletar desde Texto o Archivo .txt</h4>
+                    <label className={styles.fileUploadBtn}>
+                      <Upload size={16} /> Cargar archivo .txt
+                      <input type="file" accept=".txt" style={{ display: 'none' }} onChange={handleFileUpload} />
+                    </label>
+                  </div>
+                  
+                  <textarea 
+                    className={styles.importerTextarea}
+                    placeholder={`Pega aquí tu lista o sube un .txt. Ejemplo:\n\nSerie: El Mentalista\n\nTEMPORADA 1\nEpisodio 1 - Piloto\nEpisodio 2 - Pelo rojo y cinta plateada\n\nTEMPORADA 2\nEpisodio 1 (24) - Redención\nEpisodio 2 (25) - La letra escarlata`}
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                  />
+
+                  <div className={styles.importerActions}>
+                    <button 
+                      type="button" 
+                      className={styles.importBtn} 
+                      onClick={handleProcessBulkText}
+                      disabled={!bulkText.trim()}
+                    >
+                      <Sparkles size={16} /> Procesar y Autocompletar
+                    </button>
+                    <button 
+                      type="button" 
+                      style={{ background: '#334155', color: '#94a3b8', border: 'none', padding: '0.6rem 1rem', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }} 
+                      onClick={() => { setBulkText(''); setImportStats(null); }}
+                    >
+                      Limpiar
+                    </button>
+                    {importStats && (
+                      <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 500 }}>
+                        ✅ ¡Procesados {importStats.total} episodios en {importStats.seasons} temporada(s)!
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SELECTOR DE PESTAÑAS POR TEMPORADA */}
+              {(() => {
+                const total = parseInt(animeForm.total_episodes, 10) || 0;
+                const allNums = Array.from({ length: total }, (_, i) => i + 1);
+                const epMap = {};
+                allNums.forEach(n => {
+                  const d = getEpisodeData(n);
+                  const s = d.season || 1;
+                  if (!epMap[s]) epMap[s] = [];
+                  epMap[s].push({ absNum: n, ...d });
+                });
+                const seasonsList = Object.keys(epMap).map(Number).sort((a,b) => a - b);
+                const activeSeasonEps = selectedSeasonTab === 'all' 
+                  ? allNums.map(n => ({ absNum: n, ...getEpisodeData(n) }))
+                  : (epMap[selectedSeasonTab] || []);
+
+                return (
+                  <div>
+                    <div className={styles.seasonTabsContainer}>
+                      <button 
+                        type="button"
+                        className={`${styles.seasonTab} ${selectedSeasonTab === 'all' ? styles.seasonTabActive : ''}`}
+                        onClick={() => setSelectedSeasonTab('all')}
+                      >
+                        Todos <span className={styles.seasonBadge}>{total}</span>
+                      </button>
+
+                      {seasonsList.map(s => (
+                        <button 
+                          key={s}
+                          type="button"
+                          className={`${styles.seasonTab} ${selectedSeasonTab === s ? styles.seasonTabActive : ''}`}
+                          onClick={() => setSelectedSeasonTab(s)}
+                        >
+                          Temporada {s} <span className={styles.seasonBadge}>{epMap[s]?.length || 0}</span>
+                        </button>
+                      ))}
+
+                      <button 
+                        type="button"
+                        className={styles.seasonTab}
+                        style={{ borderStyle: 'dashed', borderColor: '#38bdf8', color: '#38bdf8' }}
+                        onClick={handleAddSeason}
+                      >
+                        <Plus size={14} /> Nueva Temporada
+                      </button>
+                    </div>
+
+                    {/* CUADRÍCULA DE EPISODIOS */}
+                    <div className={styles.episodesGrid} style={{ marginTop: '1.25rem' }}>
+                      {activeSeasonEps.map((ep) => (
+                        <div 
+                          key={ep.absNum} 
+                          className={styles.episodeInput}
+                          style={{ 
+                            background: '#0f172a', 
+                            padding: '0.85rem', 
+                            borderRadius: '0.5rem', 
+                            border: '1px solid #1e293b' 
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.85rem' }}>
+                              T{ep.season}E{ep.episode}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              #{ep.absNum}
+                            </span>
+                          </div>
+
+                          <input 
+                            type="text" 
+                            className={styles.input} 
+                            placeholder="Nombre del episodio..." 
+                            value={ep.name}
+                            onChange={(e) => handleEpisodeFieldChange(ep.absNum, 'name', e.target.value)}
+                            style={{ fontSize: '0.85rem' }}
+                          />
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Temporada:</span>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              value={ep.season} 
+                              onChange={(e) => handleEpisodeFieldChange(ep.absNum, 'season', e.target.value)}
+                              style={{ 
+                                width: '50px', 
+                                padding: '0.2rem 0.4rem', 
+                                background: '#1e293b', 
+                                color: 'white', 
+                                border: '1px solid #334155', 
+                                borderRadius: '0.25rem', 
+                                fontSize: '0.75rem',
+                                textAlign: 'center'
+                              }} 
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => handleAddEpisodeToSeason(selectedSeasonTab)}
+                        style={{ 
+                          background: '#1e293b', 
+                          color: '#38bdf8', 
+                          border: '1px dashed #0284c7', 
+                          padding: '0.5rem 1rem', 
+                          borderRadius: '0.5rem', 
+                          cursor: 'pointer', 
+                          fontSize: '0.85rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                      >
+                        <Plus size={16} /> Añadir Episodio a {selectedSeasonTab === 'all' ? 'Temporada 1' : `Temporada ${selectedSeasonTab}`}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
