@@ -256,7 +256,6 @@ async function runScraper() {
             // Pausa reducida después de seleccionar audio
             await new Promise(r => setTimeout(r, 400));
 
-
             // ----- NUEVO: DETECCIÓN DE REPRODUCTOR MULTI-SERVIDOR INTERNO (finalizePlayer) -----
             let multiServerFound = false;
             console.log(`[🤖] Esperando a que el reproductor cargue (puede tardar unos segundos)...`);
@@ -274,7 +273,7 @@ async function runScraper() {
                             break;
                         }
                     } catch(e) {
-                        // Ignorar errores de acceso cruzado a iframes
+                        // Ignorar
                     }
                 }
                 
@@ -290,12 +289,44 @@ async function runScraper() {
                         if (iframe) iframe.src = iframe.src;
                     });
                 }
-                if (attempt === 25) {
-                    console.log(`[🤖] Segundo intento de recarga del iframe por precaución...`);
-                    await page.evaluate(() => {
+                
+                if (attempt === 20 || attempt === 30) {
+                    console.log(`[🤖] OFFLINE persistente. Abriendo reproductor en pestaña nueva para forzar conexión (Intento ${attempt})...`);
+                    const iframeUrl = await page.evaluate(() => {
                         const iframe = document.querySelector('.nt-stage iframe');
-                        if (iframe) iframe.src = iframe.src;
+                        return iframe ? iframe.src : null;
                     });
+                    
+                    if (iframeUrl) {
+                        let newTab;
+                        try {
+                            newTab = await browser.newPage();
+                            await newTab.goto(iframeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                            
+                            // Revisar frames dentro de la nueva pestaña por 5 segundos
+                            for(let t=0; t<5; t++) {
+                                await new Promise(r => setTimeout(r, 1000));
+                                for (const frame of newTab.frames()) {
+                                    try {
+                                        const content = await frame.content();
+                                        const match = content.match(/finalizePlayer\s*\(\s*(\{.*?\})\s*\)/);
+                                        if (match && match[1]) {
+                                            jsonDataToProcess = JSON.parse(match[1]);
+                                            break;
+                                        }
+                                    } catch(e) {}
+                                }
+                                if (jsonDataToProcess) break;
+                            }
+                            await newTab.close();
+                        } catch(e) {
+                            if (newTab) try { await newTab.close(); } catch(err){}
+                        }
+                    }
+                    if (jsonDataToProcess) {
+                        console.log(`[🤖] ¡Éxito! Conexión lograda desde la pestaña nueva.`);
+                        break;
+                    }
                 }
                 
                 await new Promise(r => setTimeout(r, 1000));
@@ -380,8 +411,6 @@ async function runScraper() {
                 const srvBtns = Array.from(document.querySelectorAll('div[data-nt-menu="server"] button'));
                 const results = [];
                 srvBtns.forEach((b, idx) => {
-                    // Si encontramos los internos, excluimos el "Servidor 1" (porque es el menú del que ya extrajimos)
-                    // Si NO lo encontramos, incluimos el "Servidor 1" porque podría ser un embed directo de uqload u otro.
                     if (multiFound) {
                         if (!b.innerText.toLowerCase().includes('servidor 1')) {
                             results.push({ name: b.innerText.trim(), index: idx });
