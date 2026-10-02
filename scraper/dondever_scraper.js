@@ -290,22 +290,33 @@ async function runScraper() {
                     });
                 }
                 
-                if (attempt === 20 || attempt === 30) {
-                    console.log(`[🤖] OFFLINE persistente. Abriendo reproductor en pestaña nueva para forzar conexión (Intento ${attempt})...`);
-                    const iframeUrl = await page.evaluate(() => {
-                        const iframe = document.querySelector('.nt-stage iframe');
-                        return iframe ? iframe.src : null;
-                    });
-                    
-                    if (iframeUrl) {
-                        let newTab;
-                        try {
-                            newTab = await browser.newPage();
-                            await newTab.goto(iframeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-                            
-                            // Revisar frames dentro de la nueva pestaña por 5 segundos
-                            for(let t=0; t<5; t++) {
-                                await new Promise(r => setTimeout(r, 1000));
+                if (attempt === 25) {
+                    console.log(`[🤖] OFFLINE severo. Recargando la página completa del episodio...`);
+                    try {
+                        const episodeUrl = "https://dondever.net/episodes/" + seriesSlug + "-" + epData.season + "x" + epData.episode + "/";
+                        await page.goto(episodeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                        await new Promise(r => setTimeout(r, 2000));
+                        await page.evaluate(() => {
+                            const btn = document.querySelector('.play-box') || document.querySelector('.nt-stage');
+                            if (btn) btn.click();
+                        });
+                        await new Promise(r => setTimeout(r, 2000));
+                        // Seleccionar latino de nuevo
+                        await page.evaluate(() => {
+                            const audioBtn = document.querySelector('button[data-nt-menu-btn="audio"]');
+                            if(audioBtn) {
+                                audioBtn.click();
+                                const audios = Array.from(document.querySelectorAll('div[data-nt-menu="audio"] button'));
+                                const latino = audios.find(b => b.innerText.toLowerCase().includes('latino'));
+                                if(latino) latino.click();
+                                else audioBtn.click();
+                            }
+                        });
+                        await new Promise(r => setTimeout(r, 2000));
+                    } catch(e) {}
+                }
+                
+                await new Promise(r => setTimeout(r, 1000));
                                 for (const frame of newTab.frames()) {
                                     try {
                                         const content = await frame.content();
@@ -445,6 +456,10 @@ async function runScraper() {
                 });
 
                 if (iframeSrc) {
+                    if (iframeSrc.includes('unlimplay.com') || iframeSrc.includes('player.dondever.net')) {
+                        console.log(`[❌] Ignorando iframe interno (${iframeSrc}) porque requiere token de sesión y expirará.`);
+                        continue;
+                    }
                     let finalServerName = srv.name; 
                     if (iframeSrc.includes('uqload')) finalServerName = 'Uqload';
                     else if (iframeSrc.includes('bysezoxexe')) finalServerName = 'DondeVerByse';
