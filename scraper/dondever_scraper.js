@@ -263,8 +263,8 @@ async function runScraper() {
             
             let jsonDataToProcess = null;
             
-            // Polling loop: intentamos hasta 20 veces (1 segundo de pausa)
-            for (let attempt = 1; attempt <= 20; attempt++) {
+            // Polling loop: intentamos hasta 35 veces (1 segundo de pausa)
+            for (let attempt = 1; attempt <= 35; attempt++) {
                 for (const frame of page.frames()) {
                     try {
                         const content = await frame.content();
@@ -279,8 +279,23 @@ async function runScraper() {
                 }
                 
                 if (jsonDataToProcess) {
-                    console.log(`[🤖] Reproductor interno detectado rápidamente en el intento ${attempt}.`);
+                    console.log(`[🤖] Reproductor interno detectado en el intento ${attempt}.`);
                     break;
+                }
+                
+                if (attempt === 15) {
+                    console.log(`[🤖] El reproductor parece atascado (OFFLINE). Forzando recarga del iframe...`);
+                    await page.evaluate(() => {
+                        const iframe = document.querySelector('.nt-stage iframe');
+                        if (iframe) iframe.src = iframe.src;
+                    });
+                }
+                if (attempt === 25) {
+                    console.log(`[🤖] Segundo intento de recarga del iframe por precaución...`);
+                    await page.evaluate(() => {
+                        const iframe = document.querySelector('.nt-stage iframe');
+                        if (iframe) iframe.src = iframe.src;
+                    });
                 }
                 
                 await new Promise(r => setTimeout(r, 1000));
@@ -357,20 +372,26 @@ async function runScraper() {
                 console.log(`[🤖] Extracción interna completada. Buscando servidores externos adicionales...`);
             }
 
-            // Leer lista de servidores excluyendo el "Servidor 1"
-            const serversToScrape = await page.evaluate(() => {
+            // Leer lista de servidores
+            const serversToScrape = await page.evaluate((multiFound) => {
                 const btn = document.querySelector('button[data-nt-menu-btn="server"]');
                 if(btn) btn.click();
                 
                 const srvBtns = Array.from(document.querySelectorAll('div[data-nt-menu="server"] button'));
                 const results = [];
                 srvBtns.forEach((b, idx) => {
-                    if (!b.innerText.toLowerCase().includes('servidor 1')) {
+                    // Si encontramos los internos, excluimos el "Servidor 1" (porque es el menú del que ya extrajimos)
+                    // Si NO lo encontramos, incluimos el "Servidor 1" porque podría ser un embed directo de uqload u otro.
+                    if (multiFound) {
+                        if (!b.innerText.toLowerCase().includes('servidor 1')) {
+                            results.push({ name: b.innerText.trim(), index: idx });
+                        }
+                    } else {
                         results.push({ name: b.innerText.trim(), index: idx });
                     }
                 });
                 return results;
-            });
+            }, multiServerFound);
 
             console.log(`[🤖] Hay ${serversToScrape.length} servidores válidos.`);
 
