@@ -66,11 +66,11 @@ const Home = () => {
       {/* Continuar Viendo */}
       {(continueWatching || []).length > 0 && (
         <Carousel title="Continuar Viendo">
-          {(continueWatching || []).map(anime => (
+          {(continueWatching || []).filter(a => typeof a === 'object' && a.id).map(anime => (
             <AnimeCard 
               key={`continue-${anime.id}`}
               anime={anime}
-              isFavorite={favoriteAnimes.some(a => a.id === anime.id)}
+              isFavorite={favoriteAnimes.some(fav => fav.id === anime.id)}
               onToggleFavorite={handleToggleFavorite}
               onHide={handleHide}
               onRemoveContinue={handleRemoveContinue}
@@ -82,7 +82,7 @@ const Home = () => {
       {/* Carrusel de Favoritos (Solo aparece si hay favoritos) */}
       {(favoriteAnimes || []).length > 0 && (
         <Carousel title="Tus Animes Favoritos">
-          {(favoriteAnimes || []).map(anime => (
+          {(favoriteAnimes || []).filter(a => typeof a === 'object' && a.id).map(anime => (
             <AnimeCard 
               key={`fav-${anime.id}`}
               anime={anime}
