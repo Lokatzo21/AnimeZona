@@ -229,17 +229,19 @@ const Profile = () => {
             )}
 
             <h2 className={styles.sectionTitle} style={{ marginTop: '3rem' }}>Animes Vistos</h2>
-            {(watchedAnimes || []).length === 0 ? (
+            {(watchedAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).length === 0 ? (
               <p className={styles.emptyMsg}>Aún no has marcado ningún anime completo como visto.</p>
             ) : (
               <div className={styles.grid}>
-                {(watchedAnimes || []).map(anime => (
-                  <AnimeCard 
-                    key={`watched-${anime.id}`} 
-                    anime={anime} 
-                    isWatched={true} 
-                  />
-                ))}
+                {(watchedAnimes || [])
+                  .filter(a => a && typeof a === 'object' && a.id && a.title)
+                  .map(anime => (
+                    <AnimeCard 
+                      key={`watched-${anime.id}`} 
+                      anime={anime} 
+                      isWatched={true} 
+                    />
+                  ))}
               </div>
             )}
           </div>
