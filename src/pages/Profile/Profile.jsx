@@ -248,18 +248,20 @@ const Profile = () => {
         {activeTab === 'favoritos' && (
           <div>
             <h2 className={styles.sectionTitle}>Mis Favoritos</h2>
-            {(favoriteAnimes || []).length === 0 ? (
+            {(favoriteAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).length === 0 ? (
               <p className={styles.emptyMsg}>No tienes ningún anime en favoritos.</p>
             ) : (
               <div className={styles.grid}>
-                {(favoriteAnimes || []).map(anime => (
-                  <AnimeCard 
-                    key={`fav-${anime.id}`} 
-                    anime={anime}
-                    isFavorite={true}
-                    onToggleFavorite={handleToggleFavorite}
-                  />
-                ))}
+                {(favoriteAnimes || [])
+                  .filter(a => a && typeof a === 'object' && a.id && a.title)
+                  .map(anime => (
+                    <AnimeCard 
+                      key={`fav-${anime.id}`} 
+                      anime={anime}
+                      isFavorite={true}
+                      onToggleFavorite={handleToggleFavorite}
+                    />
+                  ))}
               </div>
             )}
           </div>

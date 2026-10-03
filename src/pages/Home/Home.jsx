@@ -80,9 +80,9 @@ const Home = () => {
       )}
 
       {/* Carrusel de Favoritos (Solo aparece si hay favoritos) */}
-      {(favoriteAnimes || []).length > 0 && (
+      {(favoriteAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).length > 0 && (
         <Carousel title="Tus Animes Favoritos">
-          {(favoriteAnimes || []).filter(a => typeof a === 'object' && a.id).map(anime => (
+          {(favoriteAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).map(anime => (
             <AnimeCard 
               key={`fav-${anime.id}`}
               anime={anime}

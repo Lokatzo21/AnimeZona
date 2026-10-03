@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { api } from '../services/api';
 
@@ -7,76 +7,88 @@ const DataRepairer = () => {
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [hiddenAnimes, setHiddenAnimes] = useLocalStorage('hiddenAnimes', []);
   const [watchedAnimes, setWatchedAnimes] = useLocalStorage('watchedAnimes', []);
+  const isRepairingRef = useRef(false);
 
   useEffect(() => {
-    const repairFavorites = async () => {
-      if (!Array.isArray(favoriteAnimes)) return;
-      
-      let needsUpdate = false;
-      const newFavs = [...favoriteAnimes];
-      
-      for (let i = 0; i < newFavs.length; i++) {
-        const fav = newFavs[i];
-        if (typeof fav === 'string' || typeof fav === 'number') {
-          // It's just an ID from the Mobile App! Fetch its info
-          try {
-            const info = await api.getAnimeInfo(fav);
-            if (info) {
-              newFavs[i] = { id: info.id, title: info.title, image: info.image };
-              needsUpdate = true;
-            } else {
-              // Try to find it in animezona_fav_objects if exists locally
-              const objectsStr = window.localStorage.getItem('animezona_fav_objects');
-              if (objectsStr) {
-                  try {
-                      const objects = JSON.parse(objectsStr);
-                      const found = objects.find(o => String(o.id) === String(fav));
-                      if (found) {
-                          newFavs[i] = { id: found.id, title: found.title, image: found.image };
-                          needsUpdate = true;
-                      }
-                  } catch(e){}
-              }
-            }
-          } catch(e) {}
-        }
-      }
+    if (isRepairingRef.current) return;
 
-      if (needsUpdate) {
-        setFavoriteAnimes(newFavs);
+    const repairFavorites = async () => {
+      if (!Array.isArray(favoriteAnimes) || favoriteAnimes.length === 0) return;
+
+      const needsRepair = favoriteAnimes.some(
+        fav => typeof fav === 'string' || typeof fav === 'number' || !fav || !fav.title || !fav.image
+      );
+      if (!needsRepair) return;
+
+      isRepairingRef.current = true;
+      try {
+        const repaired = await Promise.all(
+          favoriteAnimes.map(async (fav) => {
+            if (fav && typeof fav === 'object' && fav.id && fav.title && fav.image) {
+              return fav;
+            }
+            const id = typeof fav === 'object' && fav !== null ? fav.id : fav;
+            if (!id || id === '[object Object]') return null;
+
+            try {
+              const info = await api.getAnimeInfo(id);
+              if (info && info.title) {
+                return {
+                  id: String(info.id),
+                  title: info.title,
+                  image: info.image || ''
+                };
+              }
+            } catch (e) {}
+
+            return fav && typeof fav === 'object' && fav.id ? fav : { id: String(id) };
+          })
+        );
+
+        const filtered = repaired.filter(Boolean);
+        setFavoriteAnimes(filtered);
+      } finally {
+        isRepairingRef.current = false;
       }
     };
 
     const repairContinue = () => {
-      if (!Array.isArray(continueWatching)) return;
-      
-      let needsUpdate = false;
-      const newCW = continueWatching.map(cw => {
-        if (cw && typeof cw === 'object' && cw.animeId && !cw.id) {
-          needsUpdate = true;
-          // Transform Mobile format to Web format
+      if (!Array.isArray(continueWatching) || continueWatching.length === 0) return;
+
+      const needsRepair = continueWatching.some(
+        cw => cw && typeof cw === 'object' && ((cw.animeId && !cw.id) || (cw.time !== undefined && cw.timestamp === undefined))
+      );
+      if (!needsRepair) return;
+
+      const newCW = continueWatching.map((cw) => {
+        if (cw && typeof cw === 'object') {
           return {
-            id: cw.animeId,
-            title: cw.title,
-            image: cw.image,
-            episode: cw.episodeNum,
-            timestamp: cw.time
+            id: cw.id || cw.animeId,
+            animeId: cw.animeId || cw.id,
+            title: cw.title || 'Anime',
+            image: cw.image || '',
+            episode: cw.episode || cw.episodeNum || 1,
+            episodeNum: cw.episodeNum || cw.episode || 1,
+            timestamp: cw.timestamp ?? cw.time ?? 0,
+            time: cw.time ?? cw.timestamp ?? 0
           };
         }
         return cw;
       });
 
-      if (needsUpdate) {
-        setContinueWatching(newCW);
-      }
+      setContinueWatching(newCW);
     };
 
     const repairWatched = () => {
-      if (!Array.isArray(watchedAnimes)) return;
-      let needsUpdate = false;
-      const newW = watchedAnimes.map(w => {
+      if (!Array.isArray(watchedAnimes) || watchedAnimes.length === 0) return;
+
+      const needsRepair = watchedAnimes.some(
+        w => w && typeof w === 'object' && w.animeId && !w.id
+      );
+      if (!needsRepair) return;
+
+      const newW = watchedAnimes.map((w) => {
         if (w && typeof w === 'object' && w.animeId && !w.id) {
-          needsUpdate = true;
           return {
             id: w.animeId,
             title: w.title,
@@ -87,40 +99,47 @@ const DataRepairer = () => {
         return w;
       });
 
-      if (needsUpdate) {
-        setWatchedAnimes(newW);
-      }
+      setWatchedAnimes(newW);
     };
 
     const repairHidden = async () => {
-      if (!Array.isArray(hiddenAnimes)) return;
-      let needsUpdate = false;
-      const newHidden = [...hiddenAnimes];
+      if (!Array.isArray(hiddenAnimes) || hiddenAnimes.length === 0) return;
 
-      for (let i = 0; i < newHidden.length; i++) {
-        const h = newHidden[i];
-        if (typeof h === 'string' || typeof h === 'number') {
-          // Just ID
+      const needsRepair = hiddenAnimes.some(
+        h => typeof h === 'string' || typeof h === 'number' || !h || !h.title || !h.image
+      );
+      if (!needsRepair) return;
+
+      const repaired = await Promise.all(
+        hiddenAnimes.map(async (h) => {
+          if (h && typeof h === 'object' && h.id && h.title && h.image) {
+            return h;
+          }
+          const id = typeof h === 'object' && h !== null ? h.id : h;
+          if (!id || id === '[object Object]') return null;
+
           try {
-            const info = await api.getAnimeInfo(h);
-            if (info) {
-              newHidden[i] = { id: info.id, title: info.title, image: info.image };
-              needsUpdate = true;
+            const info = await api.getAnimeInfo(id);
+            if (info && info.title) {
+              return {
+                id: String(info.id),
+                title: info.title,
+                image: info.image || ''
+              };
             }
-          } catch(e) {}
-        }
-      }
+          } catch (e) {}
 
-      if (needsUpdate) {
-        setHiddenAnimes(newHidden);
-      }
+          return h && typeof h === 'object' && h.id ? h : { id: String(id) };
+        })
+      );
+
+      setHiddenAnimes(repaired.filter(Boolean));
     };
 
     repairFavorites();
     repairContinue();
     repairWatched();
     repairHidden();
-
   }, [favoriteAnimes, continueWatching, hiddenAnimes, watchedAnimes]);
 
   return null;
