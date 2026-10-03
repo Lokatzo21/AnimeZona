@@ -46,9 +46,20 @@ export const AuthProvider = ({ children }) => {
         
       if (data) {
         data.forEach((row) => {
-          window.localStorage.setItem(row.key, JSON.stringify(row.value));
+          let valToStore = row.value;
+          if (typeof valToStore === 'string') {
+            try {
+              const parsed = JSON.parse(valToStore);
+              // Avoid re-parsing regular strings if they happen to be valid JSON somehow, we just want to catch objects/arrays that were stringified
+              if (parsed !== null && typeof parsed === 'object') {
+                valToStore = parsed;
+              }
+            } catch(e) {}
+          }
+          const strForStorage = JSON.stringify(valToStore);
+          window.localStorage.setItem(row.key, strForStorage);
           window.dispatchEvent(new CustomEvent('local-storage-sync', {
-            detail: { key: row.key, newValue: row.value }
+            detail: { key: row.key, newValue: valToStore }
           }));
         });
       }

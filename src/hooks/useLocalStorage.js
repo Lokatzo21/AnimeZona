@@ -11,7 +11,15 @@ export function useLocalStorage(key, initialValue) {
     }
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      if (item) {
+        let parsed = JSON.parse(item);
+        // FIX: Si por el bug de sincronización es un string que parece array/objeto, volver a parsear
+        if (typeof parsed === 'string' && (parsed.startsWith('[') || parsed.startsWith('{'))) {
+          try { parsed = JSON.parse(parsed); } catch(e){}
+        }
+        return parsed;
+      }
+      return initialValue;
     } catch (error) {
       console.error(error);
       return initialValue;
@@ -61,7 +69,11 @@ export function useLocalStorage(key, initialValue) {
     // Escuchar cambios desde otras pestañas
     const handleStorageChange = (e) => {
       if (e.key === key) {
-        setStoredValue(e.newValue ? JSON.parse(e.newValue) : initialValue);
+        let newVal = e.newValue ? JSON.parse(e.newValue) : initialValue;
+        if (typeof newVal === 'string' && (newVal.startsWith('[') || newVal.startsWith('{'))) {
+            try { newVal = JSON.parse(newVal); } catch(err){}
+        }
+        setStoredValue(newVal);
       }
     };
 
