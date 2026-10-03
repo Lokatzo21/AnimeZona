@@ -1,30 +1,26 @@
-// Usamos import.meta.glob de Vite para leer todos los archivos en la carpeta de forma dinámica.
-const avatarModules = import.meta.glob('/public/avatars/*.{webp,png,jpg,jpeg,gif}', { eager: true });
+// Lista predefinida de avatares disponibles en la carpeta /public/avatars/
+// Esto evita el warning de Vite "Assets in public directory cannot be imported from JavaScript"
+const avatarFiles = [
+  '1.webp', '2.webp', '3.webp', '4.webp', '5.webp',
+  '6.webp', '7.webp', '8.webp', '9.webp', '10.webp', '11.webp'
+];
 
-export const AVATARS = Object.keys(avatarModules).map((filePath, index) => {
-  // filePath será algo como '/public/avatars/1.webp'
-  // En la web (en el navegador), la carpeta 'public' es la raíz '/', así que quitamos '/public'
-  const url = filePath.replace('/public', '');
-  
-  // Extraer el nombre del archivo para usarlo de nombre descriptivo
-  const fileName = url.split('/').pop();
+export const AVATARS = avatarFiles.map((fileName, index) => {
   const nameWithoutExt = fileName.split('.')[0];
-  
-  // Si el nombre es un número (como "1"), lo llamamos "Avatar 1". 
-  // Si pusieron "Otaku.png", lo llamamos "Otaku".
   const displayName = isNaN(nameWithoutExt) ? nameWithoutExt : `Avatar ${nameWithoutExt}`;
 
   return {
     id: String(index + 1),
-    url: url,
-    name: displayName
+    url: `/avatars/${fileName}`,
+    name: displayName,
+    _fileName: fileName
   };
 });
 
-// Ordenar numéricamente si el nombre de archivo es un número, para que "10.webp" vaya después de "9.webp"
+// Ordenar numericamente
 AVATARS.sort((a, b) => {
-  const numA = parseInt(a.url.split('/').pop().split('.')[0]);
-  const numB = parseInt(b.url.split('/').pop().split('.')[0]);
+  const numA = parseInt(a._fileName.split('.')[0]);
+  const numB = parseInt(b._fileName.split('.')[0]);
   if (!isNaN(numA) && !isNaN(numB)) {
     return numA - numB;
   }

@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar/Navbar';
+import DataRepairer from './components/DataRepairer';
 import Home from './pages/Home/Home';
 import AnimeDetails from './pages/AnimeDetails/AnimeDetails';
 import Watch from './pages/Watch/Watch';
@@ -22,6 +23,7 @@ function App() {
   return (
     <AuthProvider>
       <UIProvider>
+        <DataRepairer />
         <Navbar />
         <main className={`${isWatchPage ? 'watch-page-container' : 'container'} animate-fade-in`}>
           <Routes>
