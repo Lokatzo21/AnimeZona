@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import api from '../services/api';
+import { api } from '../services/api';
 
 const DataRepairer = () => {
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
