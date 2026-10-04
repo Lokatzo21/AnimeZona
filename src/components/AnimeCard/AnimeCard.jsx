@@ -9,19 +9,40 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
   const navigate = useNavigate();
   const { showToast, showConfirm } = useUI();
   const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
+  const [videoProgress] = useLocalStorage('videoProgress', {});
   const [confirmHide, setConfirmHide] = useState(false);
   
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
 
-  const handleContextMenu = (e) => {
-    if (onContextMenu) {
-      e.preventDefault();
-      onContextMenu(e, anime);
+  const targetEp = anime.episodeNumber || anime.episode || anime.episodeNum || (anime.episodeId ? String(anime.episodeId) : null);
+  const linkTo = targetEp ? `/watch/${anime.id}/${targetEp}` : `/anime/${anime.id}`;
+  const season = anime.season || anime.seasonNum || anime.seasonNumber || 1;
+  const isContinueWatching = Boolean(onRemoveContinue || targetEp);
+
+  // Extraer progreso de tiempo en segundos (de las propiedades del anime o del mapa videoProgress)
+  let rawTime = Number(anime.time ?? anime.timestamp ?? anime.progress ?? 0);
+  if ((!rawTime || rawTime <= 0) && targetEp && anime.id) {
+    const key = `${anime.id}-${targetEp}`;
+    if (videoProgress && videoProgress[key]) {
+      rawTime = Number(videoProgress[key]);
     }
+  }
+
+  const formatTimeDetailed = (seconds) => {
+    const s = Number(seconds);
+    if (isNaN(s) || s <= 0) return '';
+    const hrs = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = Math.floor(s % 60);
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+    }
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
 
-  const linkTo = anime.episodeId ? `/watch/${anime.id}/${anime.episodeId}` : `/anime/${anime.id}`;
+  const formattedTime = formatTimeDetailed(rawTime);
+  const progressPercent = rawTime > 0 ? Math.min(100, Math.max(3, (rawTime / (anime.duration || 1440)) * 100)) : 0;
 
   const handleTagClick = (e, genre) => {
     e.preventDefault();
@@ -131,9 +152,17 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
             </div>
           )}
         </div>
-        {anime.episodeNumber && (
+        {targetEp && (
           <div className={styles.episodeBadge}>
-            Ep {anime.episodeNumber}
+            T{season} Ep {targetEp}
+          </div>
+        )}
+        {progressPercent > 0 && (
+          <div className={styles.progressBarTrack}>
+            <div 
+              className={styles.progressBarFill} 
+              style={{ width: `${progressPercent}%` }} 
+            />
           </div>
         )}
       </Link>
@@ -141,7 +170,12 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
       <div className={styles.info}>
         <div className={styles.titleWrapper}>
           <h3 className={styles.title} title={anime.title}>{anime.title}</h3>
-          {anime.status && (
+          {isContinueWatching && targetEp && (
+            <span className={styles.continueSubtitle}>
+              T{season} Ep.{targetEp} {formattedTime ? `• ${formattedTime}` : ''}
+            </span>
+          )}
+          {anime.status && !isContinueWatching && (
             <span className={`${styles.statusBadge} ${anime.status === 'En emisión' ? styles.statusAiring : styles.statusFinished}`}>
               {anime.status}
             </span>
