@@ -18,33 +18,45 @@ const TMDB_GENRES_REVERSE = Object.entries(TMDB_GENRES).reduce((acc, [key, val])
 }, {});
 
 // Map TMDB data
-const mapAnimeData = (item) => ({
-  id: item.id,
-  title: item.name || item.original_name,
-  image: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/225x318?text=No+Image',
-  banner: item.backdrop_path 
-    ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}` 
-    : (item.poster_path ? `https://image.tmdb.org/t/p/w1280${item.poster_path}` : 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&q=80'),
-  score: item.vote_average ? (item.vote_average).toFixed(1) : 'N/A',
-  totalEpisodes: item.number_of_episodes || null, 
-  episodes: item.number_of_episodes || null,
-  type: 'TV',
-  description: item.overview || 'Sin sinopsis disponible.',
-  genres: item.genres 
-    ? item.genres.map(g => g.name) 
-    : (item.genre_ids ? item.genre_ids.map(id => TMDB_GENRES_REVERSE[id]).filter(Boolean) : []),
-  status: item.status === 'Ended' ? 'Finalizado' : item.status === 'Returning Series' ? 'En emisión' : item.status,
-  trailer: item.videos?.results?.length > 0 ? `https://www.youtube.com/embed/${item.videos.results[0].key}` : null,
-  isCustom: false,
-  isSecret: false
-});
+const mapAnimeData = (item) => {
+  const hasBackdrop = Boolean(item.backdrop_path);
+  const backdropUrl = hasBackdrop 
+    ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` 
+    : null;
+  const posterUrl = item.poster_path 
+    ? `https://image.tmdb.org/t/p/original${item.poster_path}` 
+    : (item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/225x318?text=No+Image');
+
+  return {
+    id: item.id,
+    title: item.name || item.original_name,
+    image: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/225x318?text=No+Image',
+    banner: backdropUrl || posterUrl || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1920&q=95',
+    backdrop: backdropUrl,
+    hasBackdrop,
+    score: item.vote_average ? (item.vote_average).toFixed(1) : 'N/A',
+    totalEpisodes: item.number_of_episodes || null, 
+    episodes: item.number_of_episodes || null,
+    type: 'TV',
+    description: item.overview || 'Sin sinopsis disponible.',
+    genres: item.genres 
+      ? item.genres.map(g => g.name) 
+      : (item.genre_ids ? item.genre_ids.map(id => TMDB_GENRES_REVERSE[id]).filter(Boolean) : []),
+    status: item.status === 'Ended' ? 'Finalizado' : item.status === 'Returning Series' ? 'En emisión' : item.status,
+    trailer: item.videos?.results?.length > 0 ? `https://www.youtube.com/embed/${item.videos.results[0].key}` : null,
+    isCustom: false,
+    isSecret: false
+  };
+};
 
 // Map Custom Anime data
 const mapCustomAnime = (item) => ({
   id: item.id,
   title: item.title,
   image: item.image || 'https://via.placeholder.com/225x318?text=No+Image',
-  banner: item.banner || item.image || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&q=80',
+  banner: item.banner || item.image || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1920&q=95',
+  backdrop: item.banner || null,
+  hasBackdrop: Boolean(item.banner),
   score: item.score || 'N/A',
   totalEpisodes: item.total_episodes || null,
   episodes: item.total_episodes || null,

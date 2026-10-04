@@ -34,12 +34,28 @@ const Home = () => {
     fetchHomeData();
   }, []);
 
-  // Animes para el Hero Carousel superior (Tendencias destacadas)
+  // Animes para el Hero Carousel superior (Tendencias destacadas con fondo widescreen HD real)
   const carouselAnimes = useMemo(() => {
-    const list = (allTimeAnime && allTimeAnime.length > 0 ? allTimeAnime : topAnime) || [];
-    return list
-      .filter(a => a && typeof a === 'object' && a.id && a.title && !(hiddenAnimes || []).some(h => h.id === a.id))
-      .slice(0, 6);
+    const all = [...(allTimeAnime || []), ...(topAnime || [])];
+    const seen = new Set();
+    const unique = [];
+
+    for (const anime of all) {
+      if (!anime || typeof anime !== 'object' || !anime.id || !anime.title) continue;
+      if (seen.has(anime.id)) continue;
+      if ((hiddenAnimes || []).some(h => h.id === anime.id)) continue;
+      if (anime.isSecret || anime.is_secret) continue;
+      seen.add(anime.id);
+      unique.push(anime);
+    }
+
+    // Priorizar series que tienen backdrop horizontal en alta definición (1080p/4K)
+    const hdBackdropAnimes = unique.filter(a => a.hasBackdrop || (a.backdrop && !a.backdrop.includes('placeholder')));
+    
+    if (hdBackdropAnimes.length >= 4) {
+      return hdBackdropAnimes.slice(0, 6);
+    }
+    return unique.slice(0, 6);
   }, [allTimeAnime, topAnime, hiddenAnimes]);
 
   const handleToggleFavorite = (anime) => {

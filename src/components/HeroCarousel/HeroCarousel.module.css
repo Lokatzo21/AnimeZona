@@ -63,13 +63,26 @@
   height: 100%;
   object-fit: cover;
   object-position: center 25%;
-  transform: scale(1);
+  transform: scale(1) translateZ(0);
   transition: transform 7.5s ease-out;
   display: block;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.blurredFallback {
+  filter: blur(28px) brightness(0.4);
+  transform: scale(1.15) translateZ(0);
 }
 
 .zoomActive {
-  transform: scale(1.06);
+  transform: scale(1.05) translateZ(0);
+}
+
+.blurredFallback.zoomActive {
+  transform: scale(1.18) translateZ(0);
 }
 
 /* Vignette Gradients for Text Legibility & Bottom Diffusion */

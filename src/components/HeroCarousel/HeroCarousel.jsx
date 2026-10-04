@@ -59,7 +59,8 @@ const HeroCarousel = ({ animes = [], loading = false, favoriteAnimes = [], onTog
       {validAnimes.map((anime, index) => {
         const isActive = index === currentIndex;
         const isFav = favoriteAnimes.some(fav => (fav?.id || fav) === anime.id);
-        const bannerUrl = anime.banner || anime.image;
+        const hasWideBackdrop = Boolean(anime.hasBackdrop || (anime.backdrop && !anime.backdrop.includes('placeholder')));
+        const bannerUrl = anime.backdrop || anime.banner || anime.image;
 
         return (
           <div 
@@ -72,8 +73,9 @@ const HeroCarousel = ({ animes = [], loading = false, favoriteAnimes = [], onTog
               <img 
                 src={bannerUrl} 
                 alt={anime.title} 
-                className={`${styles.backdropImage} ${isActive ? styles.zoomActive : ''}`}
+                className={`${styles.backdropImage} ${!hasWideBackdrop ? styles.blurredFallback : ''} ${isActive ? styles.zoomActive : ''}`}
                 loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
                 fetchpriority={isActive ? "high" : "auto"}
               />
             </div>
