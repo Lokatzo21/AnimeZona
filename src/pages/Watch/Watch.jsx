@@ -71,6 +71,8 @@ const Watch = () => {
   const nativeVideoRef = useRef(null);
   const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
+  const currentEp = episodes.find(ep => ep.id.toString() === episode.toString());
+  const currentSeason = currentEp ? (currentEp.season || 1) : 1;
 
   // Admin Config States
   const [introStartInput, setIntroStartInput] = useState('');
@@ -222,6 +224,35 @@ const Watch = () => {
         ...(prev || {}),
         [key]: currentTime
       }));
+
+      // Mantener sincronizado Continuar Viendo con tiempo y temporada exactos
+      const updateCwItem = prev => {
+        const list = prev || [];
+        return list.map(item => {
+          if (String(item.id) === String(id) || String(item.animeId) === String(id)) {
+            return {
+              ...item,
+              timestamp: currentTime,
+              time: currentTime,
+              progress: currentTime,
+              season: currentSeason || item.season || 1,
+              seasonNum: currentSeason || item.seasonNum || 1,
+              seasonNumber: currentSeason || item.seasonNumber || 1,
+              episode: episode,
+              episodeNumber: episode,
+              episodeId: episode
+            };
+          }
+          return item;
+        });
+      };
+
+      const isSecret = secretLikes.some(a => String(a.id) === String(id));
+      if (isSecret) {
+        setSecretContinueWatching(updateCwItem);
+      } else {
+        setContinueWatching(updateCwItem);
+      }
     }
   };
 
@@ -425,12 +456,20 @@ const Watch = () => {
         // Guardar progreso en Continuar Viendo (Normal o Secreto)
         const updateContinueWatching = prev => {
           const currentList = prev || [];
+          const currentProgress = videoProgress?.[`${animeInfo.id}-${episode}`] || 0;
           const animeData = {
             id: animeInfo.id,
             title: animeInfo.title,
             image: animeInfo.image,
             episodeNumber: episode,
-            episodeId: episode
+            episodeId: episode,
+            episode: episode,
+            season: seasonNumber || 1,
+            seasonNum: seasonNumber || 1,
+            seasonNumber: seasonNumber || 1,
+            timestamp: currentProgress,
+            time: currentProgress,
+            progress: currentProgress
           };
           const filtered = currentList.filter(item => String(item.id) !== String(animeInfo.id));
           return [animeData, ...filtered].slice(0, 20);
@@ -595,6 +634,7 @@ const Watch = () => {
                           className={styles.iframe}
                           onLoadedMetadata={handleVideoLoaded}
                           onTimeUpdate={handleTimeUpdate}
+                          onPause={handleTimeUpdate}
                           onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                         ></video>
                         
@@ -638,6 +678,7 @@ const Watch = () => {
                         className={styles.iframe}
                         onLoadedMetadata={handleVideoLoaded}
                         onTimeUpdate={handleTimeUpdate}
+                        onPause={handleTimeUpdate}
                         onDoubleClick={handleDoubleClick}
                         onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                       ></video>

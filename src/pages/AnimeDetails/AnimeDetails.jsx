@@ -168,12 +168,20 @@ const AnimeDetails = () => {
       // Añadir a Continuar Viendo
       setContinueWatching(prev => {
         const currentList = prev || [];
+        const epObj = episodes.find(e => String(e.id) === String(epId));
+        const sNum = epObj?.season || epObj?.season_number || activeSeason || 1;
         const animeData = {
           id: animeInfo.id,
           title: animeInfo.title,
           image: animeInfo.image,
           episodeNumber: epId,
-          episodeId: epId
+          episodeId: epId,
+          episode: epId,
+          season: sNum,
+          seasonNum: sNum,
+          seasonNumber: sNum,
+          timestamp: 0,
+          time: 0
         };
         const filtered = currentList.filter(a => String(a.id) !== String(animeInfo.id));
         return [animeData, ...filtered].slice(0, 20);
