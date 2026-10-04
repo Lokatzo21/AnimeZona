@@ -139,3 +139,11 @@ main {
   padding-top: 100px !important;
   width: 100%;
 }
+
+.home-page-container {
+  flex: 1;
+  padding-top: 0 !important;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}

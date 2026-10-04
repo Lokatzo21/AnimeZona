@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Carousel from '../../components/Carousel/Carousel';
 import AnimeCard from '../../components/AnimeCard/AnimeCard';
+import HeroCarousel from '../../components/HeroCarousel/HeroCarousel';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './Home.module.css';
@@ -33,19 +34,24 @@ const Home = () => {
     fetchHomeData();
   }, []);
 
-  // Ocultar menú contextual al hacer click en cualquier lado
-  // Efecto eliminado
+  // Animes para el Hero Carousel superior (Tendencias destacadas)
+  const carouselAnimes = useMemo(() => {
+    const list = (allTimeAnime && allTimeAnime.length > 0 ? allTimeAnime : topAnime) || [];
+    return list
+      .filter(a => a && typeof a === 'object' && a.id && a.title && !(hiddenAnimes || []).some(h => h.id === a.id))
+      .slice(0, 6);
+  }, [allTimeAnime, topAnime, hiddenAnimes]);
 
   const handleToggleFavorite = (anime) => {
-    const isFav = favoriteAnimes.some(a => a.id === anime.id);
+    const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
     if (isFav) {
-      setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== anime.id));
+      setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== anime.id));
     } else {
       setFavoriteAnimes([{
         id: anime.id,
         title: anime.title,
         image: anime.image,
-      }, ...favoriteAnimes]);
+      }, ...(favoriteAnimes || [])]);
     }
   };
 
@@ -54,16 +60,25 @@ const Home = () => {
       id: anime.id,
       title: anime.title,
       image: anime.image
-    }, ...hiddenAnimes]);
+    }, ...(hiddenAnimes || [])]);
   };
 
   const handleRemoveContinue = (animeId) => {
-    setContinueWatching(continueWatching.filter(a => a.id !== animeId));
+    setContinueWatching((continueWatching || []).filter(a => a.id !== animeId));
   };
 
   return (
     <div className={styles.homeContainer}>
-      {/* Continuar Viendo */}
+      {/* Carrusel Hero Superior (Borde a borde con degradado cinematográfico) */}
+      <HeroCarousel 
+        animes={carouselAnimes}
+        loading={loading}
+        favoriteAnimes={favoriteAnimes}
+        onToggleFavorite={handleToggleFavorite}
+      />
+
+      <div className={styles.homeContent}>
+        {/* Continuar Viendo */}
       {(continueWatching || []).length > 0 && (
         <Carousel title="Continuar Viendo">
           {(continueWatching || []).filter(a => typeof a === 'object' && a.id).map(anime => (
@@ -133,8 +148,7 @@ const Home = () => {
           </div>
         )}
       </section>
-
-      {/* Menú Contextual (Custom) */}
+      </div>
     </div>
   );
 };

@@ -19,13 +19,14 @@ import MovieWatch from './pages/MovieWatch/MovieWatch';
 function App() {
   const location = useLocation();
   const isWatchPage = location.pathname.startsWith('/watch') || location.pathname.startsWith('/movie-watch');
+  const isHomePage = location.pathname === '/';
 
   return (
     <AuthProvider>
       <UIProvider>
         <DataRepairer />
         <Navbar />
-        <main className={`${isWatchPage ? 'watch-page-container' : 'container'} animate-fade-in`}>
+        <main className={`${isWatchPage ? 'watch-page-container' : isHomePage ? 'home-page-container' : 'container'} animate-fade-in`}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/anime/:id" element={<AnimeDetails />} />

@@ -22,6 +22,9 @@ const mapAnimeData = (item) => ({
   id: item.id,
   title: item.name || item.original_name,
   image: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/225x318?text=No+Image',
+  banner: item.backdrop_path 
+    ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}` 
+    : (item.poster_path ? `https://image.tmdb.org/t/p/w1280${item.poster_path}` : 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&q=80'),
   score: item.vote_average ? (item.vote_average).toFixed(1) : 'N/A',
   totalEpisodes: item.number_of_episodes || null, 
   episodes: item.number_of_episodes || null,
@@ -41,6 +44,7 @@ const mapCustomAnime = (item) => ({
   id: item.id,
   title: item.title,
   image: item.image || 'https://via.placeholder.com/225x318?text=No+Image',
+  banner: item.banner || item.image || 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&q=80',
   score: item.score || 'N/A',
   totalEpisodes: item.total_episodes || null,
   episodes: item.total_episodes || null,
