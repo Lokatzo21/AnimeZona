@@ -72,7 +72,6 @@ const Home = () => {
               anime={anime}
               isFavorite={favoriteAnimes.some(fav => fav.id === anime.id)}
               onToggleFavorite={handleToggleFavorite}
-              onHide={handleHide}
               onRemoveContinue={handleRemoveContinue}
             />
           ))}

@@ -121,7 +121,7 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
         )}
         <div className={styles.overlay}>
           <Play className={styles.playIcon} size={40} />
-          {onHide && !confirmHide && (
+          {onHide && !confirmHide && !isContinueWatching && (
             <button 
               className={styles.overlayActionBtn} 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmHide(true); }}
@@ -129,7 +129,7 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
               Ocultar<br/>Recomendación
             </button>
           )}
-          {onHide && confirmHide && (
+          {onHide && confirmHide && !isContinueWatching && (
             <div className={styles.confirmHideContainer} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
               <span className={styles.confirmText}>¿Seguro?</span>
               <div className={styles.confirmButtons}>
