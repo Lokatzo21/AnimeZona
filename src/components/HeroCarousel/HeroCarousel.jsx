@@ -93,7 +93,7 @@ const HeroCarousel = ({ animes = [], loading = false, favoriteAnimes = [], onTog
                 <div className={styles.metaRow}>
                   <span className={styles.featuredBadge}>
                     <Sparkles size={13} className={styles.sparkleIcon} />
-                    Recomendado
+                    {anime.badgeLabel || 'Recomendado'}
                   </span>
 
                   {anime.score && anime.score !== 'N/A' && (

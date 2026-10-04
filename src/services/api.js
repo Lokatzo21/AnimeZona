@@ -17,6 +17,54 @@ const TMDB_GENRES_REVERSE = Object.entries(TMDB_GENRES).reduce((acc, [key, val])
   return acc;
 }, {});
 
+// Validador de contenido seguro: filtra ecchi, harem explícito y contenido para adultos
+export const isEcchiOrNSFW = (anime) => {
+  if (!anime) return false;
+  
+  const blockedKeywords = [
+    'ecchi', 'harem', 'harén', 'erotic', 'erótica', 'erótico', 'erotismo', 'hentai',
+    'pervertid', 'fanservice', 'oppai', 'desnuda', 'desnudo', 'desnudez', 'lencería',
+    'sensual', 'sexual', 'sucubo', 'súcubo', 'lascivia', 'esclava sexual', 'tentación carnal',
+    'chicas voluptuosas', 'pechos', 'baño mixto', 'pantsu', 'bragas', 'gushing over'
+  ];
+
+  // Comprobar géneros
+  const genres = (anime.genres || []).map(g => (typeof g === 'string' ? g.toLowerCase() : ''));
+  if (genres.some(g => blockedKeywords.some(kw => g.includes(kw)))) {
+    return true;
+  }
+
+  // Comprobar título
+  const title = (anime.title || '').toLowerCase();
+  if (blockedKeywords.some(kw => title.includes(kw))) {
+    return true;
+  }
+
+  // Títulos específicos conocidos de ecchi/fanservice explícito
+  const knownEcchiTitles = [
+    'high school dxd', 'shinmai maou', 'to love ru', 'yosuga no sora', 'redo of healer',
+    'prison school', 'shimoneta', 'valkyrie drive', 'seikon no qwaser', 'kiss x sis',
+    'ishuzoku reviewers', 'interspecies reviewers', 'peter grill', 'worlds end harem',
+    'gushing over magical girls', 'chained soldier', 'tales of wedding rings', 'mato seihei'
+  ];
+  if (knownEcchiTitles.some(t => title.includes(t))) {
+    return true;
+  }
+
+  // Comprobar sinopsis
+  const desc = (anime.description || anime.overview || '').toLowerCase();
+  const strongDescFlags = [
+    'ecchi', 'harem', 'harén', 'erótico', 'erótica', 'erotismo', 'pervertido', 'pervertida',
+    'fanservice', 'lencería', 'chicas desnudas', 'tocamientos', 'poco pudor', 'desvestir',
+    'lascivo', 'lasciva', 'pechos grandes', 'sucubo', 'súcubo', 'esclavas sexuales'
+  ];
+  if (strongDescFlags.some(flag => desc.includes(flag))) {
+    return true;
+  }
+
+  return false;
+};
+
 // Map TMDB data
 const mapAnimeData = (item) => {
   const hasBackdrop = Boolean(item.backdrop_path);
@@ -150,8 +198,8 @@ export const api = {
   getTrendingAnime: async () => {
     try {
       const customAnimes = await api.getCustomAnimes(false);
-      const url1 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=1`;
-      const url2 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=2`;
+      const url1 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=1&include_adult=false`;
+      const url2 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=2&include_adult=false`;
       const [res1, res2] = await Promise.all([ fetchWithDelay(url1), fetchWithDelay(url2) ]);
       const combined = [...(res1?.results || []), ...(res2?.results || [])].map(mapAnimeData);
       return [...customAnimes, ...combined];
@@ -165,7 +213,7 @@ export const api = {
   getTopAnime: async () => {
     try {
       const customAnimes = await api.getCustomAnimes(false);
-      const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=500&page=1`;
+      const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=500&page=1&include_adult=false`;
       const data = await fetchWithDelay(url);
       return [...customAnimes.slice(0, 5), ...data.results.map(mapAnimeData)];
     } catch (error) {
@@ -178,7 +226,7 @@ export const api = {
   getRecentAnime: async () => {
     try {
       const customAnimes = await api.getCustomAnimes(false);
-      const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=first_air_date.desc&page=1`;
+      const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=first_air_date.desc&page=1&include_adult=false`;
       const data = await fetchWithDelay(url);
       return [...customAnimes, ...data.results.map(mapAnimeData)];
     } catch (error) {
@@ -198,7 +246,7 @@ export const api = {
         }
       }
 
-      let url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=${page}`;
+      let url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=${page}&include_adult=false`;
       if (genreName !== 'Todos' && TMDB_GENRES[genreName]) {
         url += `&with_genres=${TMDB_GENRES[genreName]}`;
       }
@@ -240,7 +288,7 @@ export const api = {
         return queryWords.every(word => titleLower.includes(word));
       });
 
-      const url = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(query)}`;
+      const url = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(query)}&include_adult=false`;
       const data = await fetchWithDelay(url);
       const animes = data.results.filter(item => item.original_language === 'ja');
       return [...matchedCustom, ...animes.map(mapAnimeData)];

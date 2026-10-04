@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Carousel from '../../components/Carousel/Carousel';
 import AnimeCard from '../../components/AnimeCard/AnimeCard';
 import HeroCarousel from '../../components/HeroCarousel/HeroCarousel';
-import { api } from '../../services/api';
+import { api, isEcchiOrNSFW } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './Home.module.css';
 
@@ -34,29 +34,79 @@ const Home = () => {
     fetchHomeData();
   }, []);
 
-  // Animes para el Hero Carousel superior (Tendencias destacadas con fondo widescreen HD real)
+  // Animes para el Hero Carousel superior:
+  // 1. Favoritos del usuario y Continuar Viendo con backdrop HD
+  // 2. Recomendados seguros de la comunidad (Top Anime)
+  // 3. Filtro estricto que elimina ecchi, contenido para adultos o sugerente
   const carouselAnimes = useMemo(() => {
-    const all = [...(allTimeAnime || []), ...(topAnime || [])];
+    const list = [];
     const seen = new Set();
-    const unique = [];
 
-    for (const anime of all) {
-      if (!anime || typeof anime !== 'object' || !anime.id || !anime.title) continue;
-      if (seen.has(anime.id)) continue;
-      if ((hiddenAnimes || []).some(h => h.id === anime.id)) continue;
-      if (anime.isSecret || anime.is_secret) continue;
-      seen.add(anime.id);
-      unique.push(anime);
+    const isSafe = (a) => {
+      if (!a || typeof a !== 'object' || !a.id || !a.title) return false;
+      const idStr = String(a.id);
+      if (seen.has(idStr)) return false;
+      if ((hiddenAnimes || []).some(h => String(h.id) === idStr)) return false;
+      if (a.isSecret || a.is_secret) return false;
+      if (isEcchiOrNSFW(a)) return false;
+      return true;
+    };
+
+    // 1. Prioridad: Animes de la lista del usuario (Favoritos y Continuar Viendo)
+    const userPool = [
+      ...(favoriteAnimes || []).map(f => ({ ...f, _source: 'fav' })),
+      ...(continueWatching || []).map(c => ({ ...c, _source: 'cw' }))
+    ];
+
+    for (const item of userPool) {
+      if (!item || !item.id) continue;
+      const idStr = String(item.id);
+      if (seen.has(idStr)) continue;
+
+      // Buscar si tenemos datos enriquecidos con fondo HD en allTimeAnime o topAnime
+      const enriched = (allTimeAnime || []).find(a => String(a.id) === idStr) || 
+                       (topAnime || []).find(a => String(a.id) === idStr) ||
+                       item;
+
+      const hasHdBackdrop = Boolean(
+        enriched.hasBackdrop || 
+        (enriched.backdrop && !enriched.backdrop.includes('placeholder')) || 
+        (enriched.banner && !enriched.banner.includes('placeholder') && !enriched.banner.includes('w500'))
+      );
+
+      if (isSafe(enriched) && hasHdBackdrop) {
+        seen.add(idStr);
+        list.push({
+          ...enriched,
+          badgeLabel: item._source === 'fav' ? 'En tus Favoritos' : 'En tu Lista'
+        });
+      }
     }
 
-    // Priorizar series que tienen backdrop horizontal en alta definición (1080p/4K)
-    const hdBackdropAnimes = unique.filter(a => a.hasBackdrop || (a.backdrop && !a.backdrop.includes('placeholder')));
-    
-    if (hdBackdropAnimes.length >= 4) {
-      return hdBackdropAnimes.slice(0, 6);
+    // 2. Recomendados aclamados por la comunidad (Top Anime sin ecchi con alta calificación y votos)
+    const communityTop = (topAnime || []).filter(a => isSafe(a) && (a.hasBackdrop || (a.backdrop && !a.backdrop.includes('placeholder'))));
+    for (const a of communityTop) {
+      if (list.length >= 6) break;
+      const idStr = String(a.id);
+      if (!seen.has(idStr)) {
+        seen.add(idStr);
+        list.push({ ...a, badgeLabel: 'Recomendado de la Comunidad' });
+      }
     }
-    return unique.slice(0, 6);
-  }, [allTimeAnime, topAnime, hiddenAnimes]);
+
+    // 3. Completar con tendencias populares limpias si hacen falta
+    const trendingSafe = (allTimeAnime || []).filter(a => isSafe(a) && (a.hasBackdrop || (a.backdrop && !a.backdrop.includes('placeholder'))));
+    for (const a of trendingSafe) {
+      if (list.length >= 6) break;
+      const idStr = String(a.id);
+      if (!seen.has(idStr)) {
+        seen.add(idStr);
+        list.push({ ...a, badgeLabel: 'Popular en Tendencia' });
+      }
+    }
+
+    return list.slice(0, 6);
+  }, [allTimeAnime, topAnime, favoriteAnimes, continueWatching, hiddenAnimes]);
 
   const handleToggleFavorite = (anime) => {
     const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
@@ -67,6 +117,11 @@ const Home = () => {
         id: anime.id,
         title: anime.title,
         image: anime.image,
+        banner: anime.banner,
+        backdrop: anime.backdrop,
+        hasBackdrop: anime.hasBackdrop,
+        score: anime.score,
+        description: anime.description
       }, ...(favoriteAnimes || [])]);
     }
   };
