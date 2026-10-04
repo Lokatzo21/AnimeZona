@@ -71,7 +71,7 @@ const Watch = () => {
   const nativeVideoRef = useRef(null);
   const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
-  const currentEp = episodes.find(ep => ep.id.toString() === episode.toString());
+  const currentEp = episodes.find(ep => String(ep?.id ?? '') === String(episode ?? ''));
   const currentSeason = currentEp ? (currentEp.season || 1) : 1;
 
   // Admin Config States

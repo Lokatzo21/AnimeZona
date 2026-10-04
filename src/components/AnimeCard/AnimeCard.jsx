@@ -15,6 +15,15 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
 
+  if (!anime || typeof anime !== 'object' || !anime.id) return null;
+
+  const handleContextMenu = (e) => {
+    if (onContextMenu) {
+      e.preventDefault();
+      onContextMenu(e, anime);
+    }
+  };
+
   const targetEp = anime.episodeNumber || anime.episode || anime.episodeNum || (anime.episodeId ? String(anime.episodeId) : null);
   const linkTo = targetEp ? `/watch/${anime.id}/${targetEp}` : `/anime/${anime.id}`;
   const season = anime.season || anime.seasonNum || anime.seasonNumber || 1;
