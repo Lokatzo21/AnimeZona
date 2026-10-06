@@ -108,8 +108,17 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
 
   return (
     <div className={styles.card} onContextMenu={handleContextMenu} onMouseLeave={handleMouseLeave}>
-      <Link to={linkTo} className={styles.imageContainer}>
-        <img src={anime.image} alt={anime.title} className={styles.image} loading="lazy" />
+      <Link to={linkTo} state={{ anime }} className={styles.imageContainer}>
+        <img 
+          src={anime.image} 
+          alt={anime.title} 
+          className={styles.image} 
+          loading="lazy" 
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80';
+          }}
+        />
         {onRemoveContinue && (
           <button 
             className={styles.removeContinueBtn}

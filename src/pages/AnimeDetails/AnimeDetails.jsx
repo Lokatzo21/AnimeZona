@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Play, Eye, Heart, Check } from 'lucide-react';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -9,10 +9,14 @@ import styles from './AnimeDetails.module.css';
 
 const AnimeDetails = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const passedAnime = location.state?.anime;
+
   const [animeInfo, setAnimeInfo] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [activeSeason, setActiveSeason] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [sagaInfo, setSagaInfo] = useState(null);
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
   const [secretLikes, setSecretLikes] = useLocalStorage('secretLikes', []);
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
@@ -45,13 +49,15 @@ const AnimeDetails = () => {
   useEffect(() => {
     const fetchInfo = async () => {
       setLoading(true);
-      // Fetch secuencial para evitar rate limit de Jikan
-      const info = await api.getAnimeInfo(id);
-      await new Promise(r => setTimeout(r, 400));
+      const typeHint = (passedAnime?.type === 'Película' || passedAnime?.contentType === 'peliculas' || passedAnime?.isMovie) ? 'movie' : null;
+      const info = await api.getAnimeInfo(id, typeHint);
+      await new Promise(r => setTimeout(r, 200));
       const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
+      const sInfo = await api.getSagaInfo(info?.id || id, info?.title);
       
       setAnimeInfo(info);
       setEpisodes(eps);
+      setSagaInfo(sInfo);
       setLoading(false);
       
       if (eps && eps.length > 0) {
@@ -63,7 +69,7 @@ const AnimeDetails = () => {
       
       if (info) {
         fetchScrapingStatus(info.id);
-        const interval = setInterval(() => fetchScrapingStatus(info.id), 5000); // Check every 5s
+        const interval = setInterval(() => fetchScrapingStatus(info.id), 5000);
         return () => clearInterval(interval);
       }
     };
@@ -96,7 +102,7 @@ const AnimeDetails = () => {
     return <div className={styles.loading}>Error al cargar el anime.</div>;
   }
 
-  const isFavorite = favoriteAnimes.some(a => a.id === animeInfo.id);
+  const isFavorite = favoriteAnimes.some(a => String(a?.id || a) === String(animeInfo.id));
 
   const startPress = (e) => {
     if (e.button && e.button !== 0) return; // Ignore right clicks
@@ -105,9 +111,9 @@ const AnimeDetails = () => {
     
     pressTimer.current = setTimeout(() => {
       isLongPress.current = true;
-      const isSecret = secretLikes.some(a => a.id === animeInfo.id);
+      const isSecret = secretLikes.some(a => String(a?.id || a) === String(animeInfo.id));
       if (!isSecret) {
-        setSecretLikes(prev => [{ id: animeInfo.id, title: animeInfo.title, image: animeInfo.image }, ...prev]);
+        setSecretLikes(prev => [{ id: String(animeInfo.id), title: animeInfo.title, image: animeInfo.image }, ...prev]);
         showToast("Listo :)");
       } else {
         showToast("Ya está en tus secretos");
@@ -130,14 +136,18 @@ const AnimeDetails = () => {
 
     if (isFavorite) {
       showConfirm("¿Estás seguro que deseas quitar este anime de tus favoritos?", () => {
-        setFavoriteAnimes(favoriteAnimes.filter(a => a.id !== animeInfo.id));
+        setFavoriteAnimes(favoriteAnimes.filter(a => String(a?.id || a) !== String(animeInfo.id)));
       });
     } else {
       setFavoriteAnimes([{
-        id: animeInfo.id,
+        id: String(animeInfo.id),
         title: animeInfo.title,
         image: animeInfo.image,
-      }, ...favoriteAnimes]);
+        banner: animeInfo.banner || animeInfo.backdrop || '',
+        score: animeInfo.score || '9.0',
+        description: animeInfo.description || '',
+        type: animeInfo.type || 'Anime'
+      }, ...favoriteAnimes.filter(a => String(a?.id || a) !== String(animeInfo.id))]);
     }
   };
 
@@ -296,101 +306,196 @@ const AnimeDetails = () => {
         </div>
       </div>
 
-      {/* Lista de Episodios */}
-      <div className={styles.episodesSection}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Episodios ({episodes.length})</h2>
-          
-          {/* Botón para limpiar vistos */}
-          {episodes.some(ep => watchedEpisodes.includes(`${animeInfo.id}-${ep.id}`)) && (
-            <button 
-              onClick={handleClearWatched}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'rgba(30, 41, 59, 0.8)', color: '#cbd5e1', fontSize: '0.875rem', fontWeight: 500, borderRadius: '0.5rem', border: '1px solid #334155', cursor: 'pointer' }}
-              title="Marcar todos como no vistos"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Limpiar vistos
-            </button>
-          )}
-        </div>
-
-        {/* Season Tabs */}
-        {(() => {
-          const seasons = [...new Set(episodes.map(ep => ep.season || ep.season_number || 1))].sort((a, b) => a - b);
-          if (seasons.length > 1) {
-            return (
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                {seasons.map(season => (
-                  <button
-                    key={season}
-                    onClick={() => setActiveSeason(season)}
-                    style={{
-                      padding: '0.5rem 1.5rem',
-                      borderRadius: '8px',
-                      background: activeSeason === season ? 'var(--primary-color)' : 'rgba(30, 41, 59, 0.5)',
-                      color: 'white',
-                      fontWeight: activeSeason === season ? 'bold' : 'normal',
-                      border: '1px solid',
-                      borderColor: activeSeason === season ? 'var(--primary-color)' : 'rgba(255,255,255,0.1)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    Temporada {season}
-                  </button>
-                ))}
-              </div>
-            );
-          }
-          return null;
-        })()}
-
-        <div className={styles.episodesGrid}>
-          {episodes
-            .filter(ep => (ep.season || ep.season_number || 1) === activeSeason)
-            .map((ep, index) => {
-            const globalEpId = `${animeInfo.id}-${ep.id}`;
-            const isEpWatched = watchedEpisodes.includes(globalEpId);
-            
-            let cleanTitle = ep.title || '';
-            cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
-            const displayTitle = `T${activeSeason}E${index + 1} - ${cleanTitle}`;
-            
-            return (
-              <Link 
-                to={`/watch/${animeInfo.id}/${ep.id}`} 
-                key={ep.id}
-                className={`glass-panel ${styles.episodeCard} ${isEpWatched ? styles.episodeWatched : ''}`}
-                title={displayTitle}
-              >
-                <div className={styles.epInfo}>
-                  <div className={styles.epNumber}>{displayTitle}</div>
-                  {isEpWatched && (
-                    <span className={styles.watchedText}>
-                      <Check size={14} />
-                      Visto
-                    </span>
-                  )}
-                </div>
-                
-                <div className={styles.playOverlay}>
-                  <Play size={24} />
-                </div>
-
-                <button 
-                  className={`${styles.epWatchBtn} ${isEpWatched ? styles.isWatchedBtn : ''}`}
-                  onClick={(e) => handleToggleEpisodeWatched(e, ep.id)}
-                  title={isEpWatched ? "Marcar como no visto" : "Marcar como visto"}
-                >
-                  <Eye size={20} />
-                </button>
+      {/* Banner de Saga / Colección Vinculada (si es una película dentro de una saga) */}
+      {sagaInfo && !sagaInfo.isParentCollection && (
+        <div className={styles.sagaBanner}>
+          <div className={styles.sagaHeader}>
+            <div className={styles.sagaHeaderLeft}>
+              <span className={styles.sagaBadge}>🎬 Saga / Colección</span>
+              <h3 className={styles.sagaTitle}>{sagaInfo.sagaTitle}</h3>
+              <p className={styles.sagaSubtitle}>
+                Esta película forma parte de la saga ({sagaInfo.totalMovies} películas disponibles).
+              </p>
+            </div>
+            {sagaInfo.collectionId && (
+              <Link to={`/anime/${sagaInfo.collectionId}`} className={styles.sagaViewAllBtn}>
+                Ver Colección Completa
               </Link>
-            );
-          })}
+            )}
+          </div>
+
+          <div className={styles.sagaMoviesRow}>
+            {sagaInfo.movies.map((m) => {
+              const isCurrent = String(m.tmdb_id) === String(animeInfo.id) ||
+                (m.title && animeInfo.title && m.title.toLowerCase().includes(animeInfo.title.toLowerCase()));
+
+              return (
+                <Link
+                  key={m.episode_number}
+                  to={m.tmdb_id ? `/anime/${m.tmdb_id}` : (sagaInfo.collectionId ? `/anime/${sagaInfo.collectionId}` : '#')}
+                  className={`${styles.sagaMovieChip} ${isCurrent ? styles.sagaMovieCurrent : ''}`}
+                  title={m.title}
+                >
+                  <span className={styles.sagaMovieNum}>Entrega #{m.episode_number}</span>
+                  <span className={styles.sagaMovieName}>{m.title}</span>
+                  {isCurrent && <span className={styles.currentBadge}>Viendo</span>}
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+
+      {/* Lista de Episodios o Reproductor de Película */}
+      {(() => {
+        const isMovie = Boolean(
+          (animeInfo?.type === 'Película' ||
+           animeInfo?.contentType === 'peliculas' ||
+           animeInfo?.isMovie ||
+           Number(animeInfo?.totalEpisodes) === 1) &&
+          !sagaInfo?.isParentCollection &&
+          !animeInfo?.isCollection &&
+          animeInfo?.type !== 'Serie' &&
+          animeInfo?.type !== 'Anime' &&
+          episodes.length <= 1
+        );
+
+        if (isMovie) {
+          return (
+            <div className={styles.episodesSection}>
+              <h2 className={styles.sectionTitle} style={{ marginBottom: '1.25rem' }}>Película</h2>
+              <div className={styles.moviePlayerCard}>
+                <div className={styles.movieCardLeft}>
+                  <div className={styles.movieIconWrapper}>
+                    <Play size={26} className={styles.moviePlayIcon} />
+                  </div>
+                  <div className={styles.movieTextInfo}>
+                    <h3 className={styles.movieCardTitle}>
+                      {episodes[0]?.title && !episodes[0].title.startsWith('Episodio 1')
+                        ? episodes[0].title
+                        : animeInfo.title}
+                    </h3>
+                    <span className={styles.movieCardSubtitle}>
+                      Película Completa • {animeInfo.status || 'Disponible'}
+                    </span>
+                  </div>
+                </div>
+                <Link
+                  to={`/watch/${animeInfo.id}/${episodes[0]?.id || 1}`}
+                  className={styles.moviePlayBtn}
+                >
+                  <Play size={18} />
+                  <span>Ver Película</span>
+                </Link>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className={styles.episodesSection}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>
+                {sagaInfo?.isParentCollection && (animeInfo?.type === 'Película' || animeInfo?.isCollection)
+                  ? `Películas de la Colección (${episodes.length})` 
+                  : `Episodios (${episodes.length})`}
+              </h2>
+              
+              {/* Botón para limpiar vistos */}
+              {episodes.some(ep => watchedEpisodes.includes(`${animeInfo.id}-${ep.id}`)) && (
+                <button 
+                  onClick={handleClearWatched}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: 'rgba(30, 41, 59, 0.8)', color: '#cbd5e1', fontSize: '0.875rem', fontWeight: 500, borderRadius: '0.5rem', border: '1px solid #334155', cursor: 'pointer' }}
+                  title="Marcar todos como no vistos"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Limpiar vistos
+                </button>
+              )}
+            </div>
+
+            {/* Season Tabs */}
+            {(() => {
+              const seasons = [...new Set(episodes.map(ep => ep.season || ep.season_number || 1))].sort((a, b) => a - b);
+              if (seasons.length > 1) {
+                return (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                    {seasons.map(season => (
+                      <button
+                        key={season}
+                        onClick={() => setActiveSeason(season)}
+                        style={{
+                          padding: '0.5rem 1.5rem',
+                          borderRadius: '8px',
+                          background: activeSeason === season ? 'var(--primary-color)' : 'rgba(30, 41, 59, 0.5)',
+                          color: 'white',
+                          fontWeight: activeSeason === season ? 'bold' : 'normal',
+                          border: '1px solid',
+                          borderColor: activeSeason === season ? 'var(--primary-color)' : 'rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Temporada {season}
+                      </button>
+                    ))}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div className={styles.episodesGrid}>
+              {episodes
+                .filter(ep => (ep.season || ep.season_number || 1) === activeSeason)
+                .map((ep, index) => {
+                const globalEpId = `${animeInfo.id}-${ep.id}`;
+                const isEpWatched = watchedEpisodes.includes(globalEpId);
+                
+                let cleanTitle = ep.title || '';
+                cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
+                const displayTitle = sagaInfo?.isParentCollection
+                  ? cleanTitle
+                  : `T${activeSeason}E${index + 1} - ${cleanTitle}`;
+                
+                return (
+                  <Link 
+                    to={`/watch/${animeInfo.id}/${ep.id}`} 
+                    key={ep.id}
+                    className={`glass-panel ${styles.episodeCard} ${isEpWatched ? styles.episodeWatched : ''}`}
+                    title={displayTitle}
+                  >
+                    <div className={styles.epInfo}>
+                      <div className={styles.epNumber}>{displayTitle}</div>
+                      {isEpWatched && (
+                        <span className={styles.watchedText}>
+                          <Check size={14} />
+                          Visto
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className={styles.playOverlay}>
+                      <Play size={24} />
+                    </div>
+
+                    <button 
+                      className={`${styles.epWatchBtn} ${isEpWatched ? styles.isWatchedBtn : ''}`}
+                      onClick={(e) => handleToggleEpisodeWatched(e, ep.id)}
+                      title={isEpWatched ? "Marcar como no visto" : "Marcar como visto"}
+                    >
+                      <Eye size={20} />
+                    </button>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal de Listas */}
       {showListModal && (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,17 +42,48 @@ const Profile = () => {
     }
   }, [activeTab]);
 
+  const displayFavorites = useMemo(() => {
+    return (favoriteAnimes || [])
+      .filter(a => a && (typeof a === 'object' ? a.id : a))
+      .map(a => {
+        if (typeof a === 'object') {
+          return {
+            ...a,
+            id: String(a.id),
+            title: a.title || `Anime #${a.id}`,
+            image: a.image || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80'
+          };
+        }
+        return {
+          id: String(a),
+          title: `Anime #${a}`,
+          image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80'
+        };
+      });
+  }, [favoriteAnimes]);
+
   const handleToggleFavorite = (anime) => {
-      const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
-      if (isFav) {
-        setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== anime.id));
-      } else {
-        setFavoriteAnimes([{
-          id: anime.id,
-          title: anime.title,
-          image: anime.image,
-        }, ...(favoriteAnimes || [])]);
-      }
+    const animeId = typeof anime === 'object' ? anime.id : anime;
+    const isFav = (favoriteAnimes || []).some(a => String(typeof a === 'object' ? a.id : a) === String(animeId));
+    if (isFav) {
+      setFavoriteAnimes((favoriteAnimes || []).filter(a => String(typeof a === 'object' ? a.id : a) !== String(animeId)));
+    } else {
+      const fullObj = typeof anime === 'object' ? {
+        id: String(anime.id),
+        title: anime.title || `Anime #${anime.id}`,
+        image: anime.image || '',
+        banner: anime.banner || anime.backdrop || '',
+        backdrop: anime.backdrop || null,
+        hasBackdrop: anime.hasBackdrop || false,
+        score: anime.score || '9.0',
+        description: anime.description || ''
+      } : {
+        id: String(animeId),
+        title: `Anime #${animeId}`,
+        image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80'
+      };
+      setFavoriteAnimes([fullObj, ...(favoriteAnimes || [])]);
+    }
   };
 
   const handleRemoveContinue = (animeId) => {
@@ -250,20 +281,18 @@ const Profile = () => {
         {activeTab === 'favoritos' && (
           <div>
             <h2 className={styles.sectionTitle}>Mis Favoritos</h2>
-            {(favoriteAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).length === 0 ? (
+            {displayFavorites.length === 0 ? (
               <p className={styles.emptyMsg}>No tienes ningún anime en favoritos.</p>
             ) : (
               <div className={styles.grid}>
-                {(favoriteAnimes || [])
-                  .filter(a => a && typeof a === 'object' && a.id && a.title)
-                  .map(anime => (
-                    <AnimeCard 
-                      key={`fav-${anime.id}`} 
-                      anime={anime}
-                      isFavorite={true}
-                      onToggleFavorite={handleToggleFavorite}
-                    />
-                  ))}
+                {displayFavorites.map(anime => (
+                  <AnimeCard 
+                    key={`fav-${anime.id}`} 
+                    anime={anime}
+                    isFavorite={true}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                ))}
               </div>
             )}
           </div>

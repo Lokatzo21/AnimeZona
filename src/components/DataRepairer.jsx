@@ -41,7 +41,14 @@ const DataRepairer = () => {
               }
             } catch (e) {}
 
-            return fav && typeof fav === 'object' && fav.id ? fav : { id: String(id) };
+            return {
+              id: String(id),
+              title: (fav && typeof fav === 'object' && fav.title) ? fav.title : `Anime #${id}`,
+              image: (fav && typeof fav === 'object' && fav.image) ? fav.image : 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80',
+              banner: (fav && typeof fav === 'object' && (fav.banner || fav.backdrop)) ? (fav.banner || fav.backdrop) : '',
+              score: (fav && typeof fav === 'object' && fav.score) ? fav.score : '9.0',
+              description: (fav && typeof fav === 'object' && fav.description) ? fav.description : ''
+            };
           })
         );
 

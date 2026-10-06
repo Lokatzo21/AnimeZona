@@ -104,7 +104,6 @@ const Navbar = () => {
         <div className={`${styles.navLinks} ${isMobileMenuOpen ? styles.mobileOpen : ''}`}>
           <Link to="/" className={styles.link} onClick={() => setIsMobileMenuOpen(false)}>Inicio</Link>
           <Link to="/catalog" className={styles.link} onClick={() => setIsMobileMenuOpen(false)}>Catálogo</Link>
-          <Link to="/movies" target="_blank" rel="noopener noreferrer" className={styles.link} onClick={() => setIsMobileMenuOpen(false)}>Películas</Link>
           
           {/* Búsqueda en Móvil */}
           <div className={`${styles.searchContainer} ${styles.mobileSearchOnly}`}>

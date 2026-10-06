@@ -77,6 +77,14 @@ const HeroCarousel = ({ animes = [], loading = false, favoriteAnimes = [], onTog
                 loading={index === 0 ? "eager" : "lazy"}
                 decoding="async"
                 fetchpriority={isActive ? "high" : "auto"}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  if (anime.image && e.currentTarget.src !== anime.image) {
+                    e.currentTarget.src = anime.image;
+                  } else {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1920&q=85';
+                  }
+                }}
               />
             </div>
 

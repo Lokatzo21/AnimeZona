@@ -6,6 +6,44 @@ import { useAuth } from '../../contexts/AuthContext';
 import { List, ChevronLeft, ChevronRight, Play, Lightbulb, Cast, EyeOff, SkipForward, FastForward, Maximize, Settings } from 'lucide-react';
 import styles from './Watch.module.css';
 
+const PRIORITY_ORDER = [
+  'ZONAAPS',
+  'CINEBEL',
+  'MULTI-AUDIO',
+  'MULTI - AUDIO',
+  'ARCHIVE',
+  'EARNVIDS',
+  'VIMEO',
+  'GOODSTREAM',
+  'STREAMWISH',
+  'UQLOAD',
+  'FILEMOON',
+  'FILELIONS',
+  'VOE',
+  'VIDEOAPP'
+];
+
+const sortServersByPriority = (srvList) => {
+  if (!Array.isArray(srvList)) return [];
+  return [...srvList].sort((a, b) => {
+    const isA_mp4 = a.url?.includes('.mp4') || a.name?.toUpperCase().includes('CINEBEL');
+    const isB_mp4 = b.url?.includes('.mp4') || b.name?.toUpperCase().includes('CINEBEL');
+    if (isA_mp4 && !isB_mp4) return -1;
+    if (!isA_mp4 && isB_mp4) return 1;
+
+    const aName = a.name?.toUpperCase() || '';
+    const bName = b.name?.toUpperCase() || '';
+    const ai = PRIORITY_ORDER.findIndex(p => aName.includes(p));
+    const bi = PRIORITY_ORDER.findIndex(p => bName.includes(p));
+
+    const aRank = ai === -1 ? 999 : ai;
+    const bRank = bi === -1 ? 999 : bi;
+
+    if (aRank !== bRank) return aRank - bRank;
+    return aName.localeCompare(bName);
+  });
+};
+
 const Watch = () => {
   const { id, episode } = useParams();
   
@@ -424,19 +462,12 @@ const Watch = () => {
         // Obtenemos todos los servidores (de todos los idiomas) para este episodio
         const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, 'sub', animeInfo.id, seasonNumber);
 
-        // Priorizar servidores CINEBEL o .mp4 para que aparezcan primero
-        serversData.sort((a, b) => {
-          const isA_mp4 = a.url?.includes('.mp4') || a.name === 'CINEBEL';
-          const isB_mp4 = b.url?.includes('.mp4') || b.name === 'CINEBEL';
-          if (isA_mp4 && !isB_mp4) return -1;
-          if (!isA_mp4 && isB_mp4) return 1;
-          return 0;
-        });
-
-        setServers(serversData);
+        // Ordenar todos los servidores por la prioridad oficial
+        const sortedServers = sortServersByPriority(serversData);
+        setServers(sortedServers);
 
         // Intentar seleccionar un idioma disponible preferido (LAT > SUB > CAST)
-        const availableLangs = [...new Set(serversData.map(s => s.lang))];
+        const availableLangs = [...new Set(sortedServers.map(s => s.lang))];
         let defaultLang = 'sub';
         if (availableLangs.includes('latino')) defaultLang = 'latino';
         else if (availableLangs.includes('sub')) defaultLang = 'sub';
@@ -444,11 +475,11 @@ const Watch = () => {
 
         setLanguage(defaultLang);
 
-        const langServers = serversData.filter(s => s.lang === defaultLang || s.lang === 'none');
+        const langServers = sortedServers.filter(s => s.lang === defaultLang || s.lang === 'none');
         if (langServers.length > 0) {
           setActiveServer(langServers[0]);
         } else {
-           setActiveServer(serversData[0]); // fallback
+           setActiveServer(sortedServers[0]); // fallback
         }
 
         const isSecret = secretLikes.some(a => String(a.id) === String(animeInfo.id));
@@ -516,7 +547,7 @@ const Watch = () => {
   // Handler para cuando el usuario cambia de idioma manualmente
   const handleLanguageChange = (newLang) => {
       setLanguage(newLang);
-      const langServers = servers.filter(s => s.lang === newLang || s.lang === 'none');
+      const langServers = sortServersByPriority(servers.filter(s => s.lang === newLang || s.lang === 'none'));
       if (langServers.length > 0) {
           setActiveServer(langServers[0]);
       }
@@ -529,8 +560,19 @@ const Watch = () => {
   const prevEpisode = currentEpIndex > 0 ? episodes[currentEpIndex - 1] : null;
   const nextEpisode = currentEpIndex >= 0 && currentEpIndex < episodes.length - 1 ? episodes[currentEpIndex + 1] : null;
   
+  const isMovie = Boolean(
+    animeInfo?.type === 'Película' ||
+    animeInfo?.contentType === 'peliculas' ||
+    animeInfo?.isMovie ||
+    episodes.length === 1
+  );
+
   let currentEpTitle = `Episodio ${episode}`;
-  if (currentEpIndex >= 0) {
+  if (isMovie) {
+    currentEpTitle = episodes[0]?.title && !episodes[0].title.startsWith('Episodio 1')
+      ? episodes[0].title
+      : animeInfo?.title || 'Película Completa';
+  } else if (currentEpIndex >= 0) {
       const epData = episodes[currentEpIndex];
       const epSeason = epData.season || epData.season_number || 1;
       const seasonEps = episodes.filter(e => (e.season || e.season_number || 1) === epSeason);
@@ -540,15 +582,10 @@ const Watch = () => {
       currentEpTitle = `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
   }
 
-  // Filtrar servidores a mostrar según el idioma seleccionado
-  const PRIORITY_ORDER = ['ZONAAPS', 'CINEBEL', 'ARCHIVE', 'MULTI - AUDIO Z'];
-  const visibleServers = servers
-    .filter(s => s.lang === language || s.lang === 'none')
-    .sort((a, b) => {
-      const ai = PRIORITY_ORDER.findIndex(p => a.name?.toUpperCase().includes(p));
-      const bi = PRIORITY_ORDER.findIndex(p => b.name?.toUpperCase().includes(p));
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-    });
+  // Filtrar servidores a mostrar según el idioma seleccionado y orden de prioridad oficial
+  const visibleServers = sortServersByPriority(
+    servers.filter(s => s.lang === language || s.lang === 'none')
+  );
   const availableLanguages = [...new Set(servers.map(s => s.lang).filter(l => l !== 'none'))];
   return (
     <div className={styles.watchContainer}>
@@ -833,7 +870,7 @@ const Watch = () => {
             <div className={styles.sidebar}>
               <div className={styles.sidebarHeader}>
                 <div>
-                  <span className={styles.sidebarTitle}>Episodios</span>
+                  <span className={styles.sidebarTitle}>{isMovie ? 'Película' : 'Episodios'}</span>
                   <span className={styles.sidebarCount}> {episodes.length}</span>
                 </div>
                 <Link to={`/anime/${id}`} className={styles.sidebarLink}>Ver ficha</Link>
@@ -849,7 +886,9 @@ const Watch = () => {
                   const epIndexInSeason = seasonEps.findIndex(e => e.id.toString() === ep.id.toString());
                   let cleanTitle = ep.title || '';
                   cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
-                  const displayTitle = `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
+                  const displayTitle = isMovie
+                    ? (ep.title && !ep.title.startsWith('Episodio 1') ? ep.title : animeInfo.title)
+                    : `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
 
                   return (
                     <Link 

@@ -15,6 +15,45 @@
   border-radius: var(--border-radius-lg);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.typeTabs {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.typeTab {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary, #cbd5e1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.55rem 1.15rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.typeTab:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.typeTab.activeType {
+  background: var(--primary-accent);
+  color: #fff;
+  border-color: var(--primary-accent-light);
+  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.45);
 }
 
 .filterGroup {
@@ -83,4 +122,77 @@
   font-size: 1.5rem;
   color: var(--text-primary);
   margin-bottom: 1rem;
+}
+
+.catalogSearchWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  width: 100%;
+}
+
+.catalogSearchInput {
+  width: 100%;
+  padding: 0.85rem 2.8rem 0.85rem 3rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(8px);
+}
+
+.catalogSearchInput:focus {
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 16px rgba(229, 9, 20, 0.35);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.catalogSearchIcon {
+  position: absolute;
+  left: 1.1rem;
+  color: var(--text-muted, #94a3b8);
+  pointer-events: none;
+}
+
+.catalogSearchClear {
+  position: absolute;
+  right: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #cbd5e1;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.catalogSearchClear:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.searchResultsNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding: 0.65rem 1.15rem;
+  background: rgba(229, 9, 20, 0.1);
+  border: 1px solid rgba(229, 9, 20, 0.25);
+  border-radius: 12px;
+  font-size: 0.88rem;
+  color: #fca5a5;
+}
+
+.searchResultsCount {
+  font-weight: 700;
+  color: #fff;
 }

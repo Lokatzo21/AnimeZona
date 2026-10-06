@@ -2,14 +2,31 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Carousel from '../../components/Carousel/Carousel';
 import AnimeCard from '../../components/AnimeCard/AnimeCard';
 import HeroCarousel from '../../components/HeroCarousel/HeroCarousel';
+import { SkeletonRow, SkeletonGrid } from '../../components/SkeletonCard/SkeletonCard';
 import { api, isEcchiOrNSFW } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './Home.module.css';
 
 const Home = () => {
-  const [topAnime, setTopAnime] = useState([]);
-  const [allTimeAnime, setAllTimeAnime] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [topAnime, setTopAnime] = useState(() => {
+    try {
+      const c = localStorage.getItem('anime_cached_home_top');
+      return c ? JSON.parse(c) : [];
+    } catch { return []; }
+  });
+  const [allTimeAnime, setAllTimeAnime] = useState(() => {
+    try {
+      const c = localStorage.getItem('anime_cached_home_trending');
+      return c ? JSON.parse(c) : [];
+    } catch { return []; }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const c1 = localStorage.getItem('anime_cached_home_top');
+      const c2 = localStorage.getItem('anime_cached_home_trending');
+      return !(c1 && c2 && JSON.parse(c1).length > 0);
+    } catch { return true; }
+  });
   
   // Local storage para animes favoritos y ocultos
   const [favoriteAnimes, setFavoriteAnimes] = useLocalStorage('favoriteAnimes', []);
@@ -17,21 +34,36 @@ const Home = () => {
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchHomeData = async () => {
-      setLoading(true);
-      // Ejecutar secuencialmente con un pequeño retraso para evitar el error 429 (Too Many Requests) de Jikan
-      const top = await api.getTopAnime();
-      await new Promise(r => setTimeout(r, 400));
-      
-      const allTime = await api.getTrendingAnime();
-      
-      setTopAnime(Array.isArray(top) ? top : []);
-      setAllTimeAnime(Array.isArray(allTime) ? allTime : []);
-      setLoading(false);
+      try {
+        // Ejecutar llamadas concurrentemente en paralelo sin demoras innecesarias
+        const [top, allTime] = await Promise.all([
+          api.getTopAnime(),
+          api.getTrendingAnime()
+        ]);
+        
+        if (!isMounted) return;
+
+        if (Array.isArray(top) && top.length > 0) {
+          setTopAnime(top);
+          try { localStorage.setItem('anime_cached_home_top', JSON.stringify(top)); } catch {}
+        }
+        if (Array.isArray(allTime) && allTime.length > 0) {
+          setAllTimeAnime(allTime);
+          try { localStorage.setItem('anime_cached_home_trending', JSON.stringify(allTime)); } catch {}
+        }
+      } catch (err) {
+        console.error('Error fetching home data:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
 
     document.title = "Inicio";
     fetchHomeData();
+
+    return () => { isMounted = false; };
   }, []);
 
   // Animes para el Hero Carousel superior:
@@ -108,21 +140,47 @@ const Home = () => {
     return list.slice(0, 6);
   }, [allTimeAnime, topAnime, favoriteAnimes, continueWatching, hiddenAnimes]);
 
+  const displayFavorites = useMemo(() => {
+    return (favoriteAnimes || [])
+      .filter(a => a && (typeof a === 'object' ? a.id : a))
+      .map(a => {
+        if (typeof a === 'object') {
+          return {
+            ...a,
+            id: String(a.id),
+            title: a.title || `Anime #${a.id}`,
+            image: a.image || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80'
+          };
+        }
+        return {
+          id: String(a),
+          title: `Anime #${a}`,
+          image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80'
+        };
+      });
+  }, [favoriteAnimes]);
+
   const handleToggleFavorite = (anime) => {
-    const isFav = (favoriteAnimes || []).some(a => a.id === anime.id);
+    const animeId = typeof anime === 'object' ? anime.id : anime;
+    const isFav = (favoriteAnimes || []).some(a => String(typeof a === 'object' ? a.id : a) === String(animeId));
     if (isFav) {
-      setFavoriteAnimes((favoriteAnimes || []).filter(a => a.id !== anime.id));
+      setFavoriteAnimes((favoriteAnimes || []).filter(a => String(typeof a === 'object' ? a.id : a) !== String(animeId)));
     } else {
-      setFavoriteAnimes([{
-        id: anime.id,
-        title: anime.title,
-        image: anime.image,
-        banner: anime.banner,
-        backdrop: anime.backdrop,
-        hasBackdrop: anime.hasBackdrop,
-        score: anime.score,
-        description: anime.description
-      }, ...(favoriteAnimes || [])]);
+      const fullObj = typeof anime === 'object' ? {
+        id: String(anime.id),
+        title: anime.title || `Anime #${anime.id}`,
+        image: anime.image || '',
+        banner: anime.banner || anime.backdrop || '',
+        backdrop: anime.backdrop || null,
+        hasBackdrop: anime.hasBackdrop || false,
+        score: anime.score || '9.0',
+        description: anime.description || ''
+      } : {
+        id: String(animeId),
+        title: `Anime #${animeId}`,
+        image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80'
+      };
+      setFavoriteAnimes([fullObj, ...(favoriteAnimes || [])]);
     }
   };
 
@@ -156,7 +214,7 @@ const Home = () => {
             <AnimeCard 
               key={`continue-${anime.id}`}
               anime={anime}
-              isFavorite={favoriteAnimes.some(fav => fav.id === anime.id)}
+              isFavorite={(favoriteAnimes || []).some(fav => String(typeof fav === 'object' ? fav.id : fav) === String(anime.id))}
               onToggleFavorite={handleToggleFavorite}
               onRemoveContinue={handleRemoveContinue}
             />
@@ -165,9 +223,9 @@ const Home = () => {
       )}
 
       {/* Carrusel de Favoritos (Solo aparece si hay favoritos) */}
-      {(favoriteAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).length > 0 && (
+      {displayFavorites.length > 0 && (
         <Carousel title="Tus Animes Favoritos">
-          {(favoriteAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).map(anime => (
+          {displayFavorites.map(anime => (
             <AnimeCard 
               key={`fav-${anime.id}`}
               anime={anime}
@@ -180,16 +238,16 @@ const Home = () => {
 
       {/* Carrusel con animes recomendados */}
       <Carousel title="Animes Recomendados (Top)">
-        {loading ? (
-          <p className={styles.loadingText}>Cargando recomendaciones...</p>
+        {loading && (!topAnime || topAnime.length === 0) ? (
+          <SkeletonRow count={6} />
         ) : (
           (topAnime || [])
-            .filter(a => !(hiddenAnimes || []).some(h => h.id === a.id))
+            .filter(a => !(hiddenAnimes || []).some(h => String(h.id) === String(a.id)))
             .slice(0, 10).map(anime => (
             <AnimeCard 
               key={`top-${anime.id}`}
               anime={anime}
-              isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
+              isFavorite={(favoriteAnimes || []).some(a => String(typeof a === 'object' ? a.id : a) === String(anime.id))}
               onToggleFavorite={handleToggleFavorite}
               onHide={handleHide}
             />
@@ -197,21 +255,20 @@ const Home = () => {
         )}
       </Carousel>
 
-
       {/* Animes Recomendados (De todos los animes existentes - Grid) */}
       <section className={styles.allTimeSection}>
         <h2 className={styles.gridTitle}>Animes Recomendados (Catálogo Global)</h2>
-        {loading ? (
-          <p className={styles.loadingText}>Cargando catálogo...</p>
+        {loading && (!allTimeAnime || allTimeAnime.length === 0) ? (
+          <SkeletonGrid count={10} />
         ) : (
           <div className={styles.animeGrid}>
             {(allTimeAnime || [])
-              .filter(a => !(hiddenAnimes || []).some(h => h.id === a.id))
+              .filter(a => !(hiddenAnimes || []).some(h => String(h.id) === String(a.id)))
               .map(anime => (
               <AnimeCard 
                 key={`alltime-${anime.id}`}
                 anime={anime}
-                isFavorite={(favoriteAnimes || []).some(a => a.id === anime.id)}
+                isFavorite={(favoriteAnimes || []).some(a => String(typeof a === 'object' ? a.id : a) === String(anime.id))}
                 onToggleFavorite={handleToggleFavorite}
                 onHide={handleHide}
               />
