@@ -502,7 +502,11 @@ const Watch = () => {
             time: currentProgress,
             progress: currentProgress
           };
-          const filtered = currentList.filter(item => String(item.id) !== String(animeInfo.id));
+          const normTitle = (animeInfo.title || '').trim().toLowerCase();
+          const filtered = currentList.filter(item =>
+            String(item.id) !== String(animeInfo.id) &&
+            (!normTitle || (item.title || '').trim().toLowerCase() !== normTitle)
+          );
           return [animeData, ...filtered].slice(0, 20);
         };
         
@@ -523,15 +527,17 @@ const Watch = () => {
         // Agregar a la lista general de "Animes Vistos" del perfil (Normal o Secreto)
         const updateWatchedAnimes = prev => {
           const currentList = prev || [];
-          if (!currentList.some(a => String(a.id) === String(animeInfo.id))) {
-            return [{
-              id: animeInfo.id,
-              title: animeInfo.title,
-              image: animeInfo.image,
-              status: animeInfo.status
-            }, ...currentList];
-          }
-          return currentList;
+          const normTitle = (animeInfo.title || '').trim().toLowerCase();
+          const filtered = currentList.filter(a =>
+            String(a.id) !== String(animeInfo.id) &&
+            (!normTitle || (a.title || '').trim().toLowerCase() !== normTitle)
+          );
+          return [{
+            id: animeInfo.id,
+            title: animeInfo.title,
+            image: animeInfo.image,
+            status: animeInfo.status
+          }, ...filtered];
         };
 
         if (isSecret) {

@@ -1,8 +1,8 @@
 .watchContainer {
   padding-top: 1rem;
   padding-bottom: 4rem;
-  max-width: 1800px;
-  width: 98%;
+  max-width: 1480px;
+  width: 96%;
   margin: 0 auto;
 }
 
@@ -56,6 +56,7 @@
 .playerContainer {
   width: 100%;
   aspect-ratio: 16/9;
+  max-height: 72vh;
   background: black;
   border-radius: var(--border-radius-lg);
   overflow: hidden;

@@ -193,8 +193,29 @@ const Home = () => {
   };
 
   const handleRemoveContinue = (animeId) => {
-    setContinueWatching((continueWatching || []).filter(a => a.id !== animeId));
+    const target = (continueWatching || []).find(a => String(a.id) === String(animeId));
+    const targetTitle = (target?.title || '').trim().toLowerCase();
+    setContinueWatching((continueWatching || []).filter(a =>
+      String(a.id) !== String(animeId) &&
+      (!targetTitle || (a.title || '').trim().toLowerCase() !== targetTitle)
+    ));
   };
+
+  const uniqueContinueWatching = useMemo(() => {
+    const seenIds = new Set();
+    const seenTitles = new Set();
+    const out = [];
+    for (const a of (continueWatching || [])) {
+      if (!a || typeof a !== 'object' || !a.id) continue;
+      const idStr = String(a.id).trim();
+      const titleNorm = (a.title || '').trim().toLowerCase();
+      if (seenIds.has(idStr) || (titleNorm && seenTitles.has(titleNorm))) continue;
+      seenIds.add(idStr);
+      if (titleNorm) seenTitles.add(titleNorm);
+      out.push(a);
+    }
+    return out;
+  }, [continueWatching]);
 
   return (
     <div className={styles.homeContainer}>
@@ -208,9 +229,9 @@ const Home = () => {
 
       <div className={styles.homeContent}>
         {/* Continuar Viendo */}
-      {(continueWatching || []).length > 0 && (
+      {uniqueContinueWatching.length > 0 && (
         <Carousel title="Continuar Viendo">
-          {(continueWatching || []).filter(a => typeof a === 'object' && a.id).map(anime => (
+          {uniqueContinueWatching.map(anime => (
             <AnimeCard 
               key={`continue-${anime.id}`}
               anime={anime}

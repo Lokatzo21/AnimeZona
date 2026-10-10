@@ -87,7 +87,12 @@ const Profile = () => {
   };
 
   const handleRemoveContinue = (animeId) => {
-    setContinueWatching((continueWatching || []).filter(a => a.id !== animeId));
+    const target = (continueWatching || []).find(a => String(a.id) === String(animeId));
+    const targetTitle = (target?.title || '').trim().toLowerCase();
+    setContinueWatching((continueWatching || []).filter(a =>
+      String(a.id) !== String(animeId) &&
+      (!targetTitle || (a.title || '').trim().toLowerCase() !== targetTitle)
+    ));
   };
 
   const handleSaveProfile = async () => {
@@ -242,14 +247,32 @@ const Profile = () => {
       )}
 
       <div className={styles.content}>
-        {activeTab === 'historial' && (
+        {activeTab === 'historial' && (() => {
+          const dedupeList = (arr) => {
+            const seenIds = new Set();
+            const seenTitles = new Set();
+            const out = [];
+            for (const a of (arr || [])) {
+              if (!a || typeof a !== 'object' || !a.id) continue;
+              const idStr = String(a.id).trim();
+              const titleNorm = (a.title || '').trim().toLowerCase();
+              if (seenIds.has(idStr) || (titleNorm && seenTitles.has(titleNorm))) continue;
+              seenIds.add(idStr);
+              if (titleNorm) seenTitles.add(titleNorm);
+              out.push(a);
+            }
+            return out;
+          };
+          const uniqueCW = dedupeList(continueWatching);
+          const uniqueWatched = dedupeList((watchedAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title));
+          return (
           <div>
             <h2 className={styles.sectionTitle}>Último capítulo visto</h2>
-            {(continueWatching || []).length === 0 ? (
+            {uniqueCW.length === 0 ? (
               <p className={styles.emptyMsg}>No tienes episodios pendientes. ¡Ve a ver un anime!</p>
             ) : (
               <div className={styles.grid}>
-                {(continueWatching || []).map(anime => (
+                {uniqueCW.map(anime => (
                   <AnimeCard 
                     key={`history-${anime.id}`} 
                     anime={anime} 
@@ -260,13 +283,11 @@ const Profile = () => {
             )}
 
             <h2 className={styles.sectionTitle} style={{ marginTop: '3rem' }}>Animes Vistos</h2>
-            {(watchedAnimes || []).filter(a => a && typeof a === 'object' && a.id && a.title).length === 0 ? (
+            {uniqueWatched.length === 0 ? (
               <p className={styles.emptyMsg}>Aún no has marcado ningún anime completo como visto.</p>
             ) : (
               <div className={styles.grid}>
-                {(watchedAnimes || [])
-                  .filter(a => a && typeof a === 'object' && a.id && a.title)
-                  .map(anime => (
+                {uniqueWatched.map(anime => (
                     <AnimeCard 
                       key={`watched-${anime.id}`} 
                       anime={anime} 
@@ -276,7 +297,8 @@ const Profile = () => {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {activeTab === 'favoritos' && (
           <div>

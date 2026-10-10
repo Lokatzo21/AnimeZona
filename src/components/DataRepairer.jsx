@@ -59,54 +59,95 @@ const DataRepairer = () => {
       }
     };
 
+    const ID_MIGRATIONS = {
+      'custom-1791092665853': 226362, // El Eternauta
+      'custom-1791530479852': 127529, // Sabuesos
+      'custom-1776054217371': 228878  // Efectos colaterales
+    };
+
+    const normalizeAndDedupe = (list, isContinue = false) => {
+      const normalized = list.map((item) => {
+        if (!item || typeof item !== 'object') return item;
+        const rawId = String(item.id || item.animeId || '').trim();
+        const migratedId = ID_MIGRATIONS[rawId] || item.id || item.animeId;
+        let title = item.title || 'Anime';
+        let image = item.image || '';
+
+        if (String(migratedId) === '278624' && (title === 'AMAZON 3D' || !title)) {
+          title = 'Lucky';
+          image = 'https://image.tmdb.org/t/p/w500/vZ3GfOoeha2xVCPec0jv2jf3yfC.jpg';
+        } else if (String(migratedId) === '226362') {
+          title = 'El Eternauta';
+          image = 'https://image.tmdb.org/t/p/w500/9Krv5NvKa5a3Q3b1l2B3rP9Bj8E.jpg';
+        } else if (String(migratedId) === '127529') {
+          title = 'Sabuesos';
+          image = image || 'https://image.tmdb.org/t/p/w500/pWzp4HpDifuyNF8zkPIy8MKCg2d.jpg';
+        }
+
+        if (isContinue) {
+          const ep = item.episode || item.episodeNum || item.episodeNumber || 1;
+          const ts = item.timestamp ?? item.time ?? item.progress ?? 0;
+          return {
+            ...item,
+            id: migratedId,
+            animeId: migratedId,
+            title,
+            image,
+            episode: ep,
+            episodeNum: ep,
+            episodeNumber: ep,
+            timestamp: ts,
+            time: ts
+          };
+        }
+
+        return {
+          ...item,
+          id: migratedId,
+          title,
+          image,
+          episode: item.episodeNum || item.episode
+        };
+      });
+
+      const deduped = [];
+      for (const item of normalized) {
+        if (!item || typeof item !== 'object' || !item.id) continue;
+        const idStr = String(item.id).trim();
+        const titleNorm = (item.title || '').trim().toLowerCase();
+        const existingIdx = deduped.findIndex(
+          ex => String(ex.id).trim() === idStr || (titleNorm && (ex.title || '').trim().toLowerCase() === titleNorm)
+        );
+        if (existingIdx === -1) {
+          deduped.push(item);
+        } else {
+          const ex = deduped[existingIdx];
+          const exIsCustom = String(ex.id).startsWith('custom-');
+          const curIsCustom = String(item.id).startsWith('custom-');
+          if (exIsCustom && !curIsCustom) {
+            deduped[existingIdx] = { ...ex, ...item, id: item.id, animeId: item.id };
+          }
+        }
+      }
+      return deduped;
+    };
+
     const repairContinue = () => {
       if (!Array.isArray(continueWatching) || continueWatching.length === 0) return;
 
-      const needsRepair = continueWatching.some(
-        cw => cw && typeof cw === 'object' && ((cw.animeId && !cw.id) || (cw.time !== undefined && cw.timestamp === undefined))
-      );
-      if (!needsRepair) return;
-
-      const newCW = continueWatching.map((cw) => {
-        if (cw && typeof cw === 'object') {
-          return {
-            id: cw.id || cw.animeId,
-            animeId: cw.animeId || cw.id,
-            title: cw.title || 'Anime',
-            image: cw.image || '',
-            episode: cw.episode || cw.episodeNum || 1,
-            episodeNum: cw.episodeNum || cw.episode || 1,
-            timestamp: cw.timestamp ?? cw.time ?? 0,
-            time: cw.time ?? cw.timestamp ?? 0
-          };
-        }
-        return cw;
-      });
-
-      setContinueWatching(newCW);
+      const deduped = normalizeAndDedupe(continueWatching, true);
+      if (JSON.stringify(deduped) !== JSON.stringify(continueWatching)) {
+        setContinueWatching(deduped);
+      }
     };
 
     const repairWatched = () => {
       if (!Array.isArray(watchedAnimes) || watchedAnimes.length === 0) return;
 
-      const needsRepair = watchedAnimes.some(
-        w => w && typeof w === 'object' && w.animeId && !w.id
-      );
-      if (!needsRepair) return;
-
-      const newW = watchedAnimes.map((w) => {
-        if (w && typeof w === 'object' && w.animeId && !w.id) {
-          return {
-            id: w.animeId,
-            title: w.title,
-            image: w.image,
-            episode: w.episodeNum || w.episode
-          };
-        }
-        return w;
-      });
-
-      setWatchedAnimes(newW);
+      const deduped = normalizeAndDedupe(watchedAnimes, false);
+      if (JSON.stringify(deduped) !== JSON.stringify(watchedAnimes)) {
+        setWatchedAnimes(deduped);
+      }
     };
 
     const repairHidden = async () => {
