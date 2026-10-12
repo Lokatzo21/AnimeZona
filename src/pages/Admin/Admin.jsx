@@ -32,6 +32,7 @@ const Admin = () => {
 
   // Add Anime Form State
   const [animeForm, setAnimeForm] = useState({
+    custom_id: '',
     title: '',
     image: '',
     description: '',
@@ -44,6 +45,10 @@ const Admin = () => {
   const [episodeNames, setEpisodeNames] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [tmdbSearchQuery, setTmdbSearchQuery] = useState('');
+  const [tmdbSearchType, setTmdbSearchType] = useState('movie');
+  const [tmdbSearchResults, setTmdbSearchResults] = useState([]);
+  const [isSearchingTmdb, setIsSearchingTmdb] = useState(false);
 
   // Bulk Episodes Importer State
   const [isImporterOpen, setIsImporterOpen] = useState(false);
@@ -147,10 +152,11 @@ const Admin = () => {
   const handleEditAnime = (anime) => {
     setEditingAnimeId(anime.id);
     setAnimeForm({
+      custom_id: anime.id ? String(anime.id) : '',
       title: anime.title || '',
       image: anime.image || '',
       description: anime.description || '',
-      total_episodes: anime.total_episodes || 12,
+      total_episodes: anime.total_episodes || anime.totalEpisodes || 12,
       status: anime.status || 'En emisión',
       is_secret: anime.is_secret || false,
       genres: anime.genres || []
@@ -616,26 +622,64 @@ const Admin = () => {
     }));
   };
 
+  const handleSearchTmdbForForm = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!tmdbSearchQuery.trim()) return;
+    setIsSearchingTmdb(true);
+    try {
+      const results = await api.searchTmdbForAdmin(tmdbSearchQuery.trim(), tmdbSearchType);
+      setTmdbSearchResults(results || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearchingTmdb(false);
+    }
+  };
+
+  const handleSelectTmdbResult = (item) => {
+    setAnimeForm(prev => ({
+      ...prev,
+      custom_id: String(item.id),
+      title: item.title || prev.title,
+      image: item.image || prev.image,
+      description: item.description || prev.description,
+      total_episodes: item.total_episodes || (item.media_type === 'movie' ? 1 : prev.total_episodes),
+      status: item.status || prev.status,
+      genres: item.genres && item.genres.length > 0 ? item.genres : prev.genres
+    }));
+    if (item.media_type === 'movie' || Number(item.total_episodes) === 1) {
+      setEpisodeNames({
+        1: { name: item.title || 'Película Completa', season: 1, episode: 1 }
+      });
+    }
+    setTmdbSearchResults([]);
+    setSuccessMsg(`✨ Datos autocompletados desde TMDB con ID oficial #${item.id} (${item.title}). Revisa y haz clic en Guardar.`);
+    setTimeout(() => setSuccessMsg(''), 6000);
+  };
+
   const handleAddCustomAnime = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSuccessMsg('');
     try {
+      const assignedId = animeForm.custom_id ? String(animeForm.custom_id).trim() : '';
       const payload = {
         ...animeForm,
+        custom_id: assignedId,
         total_episodes: parseInt(animeForm.total_episodes, 10),
         episode_names: episodeNames
       };
       
       if (editingAnimeId) {
         await api.updateCustomAnime(editingAnimeId, payload);
-        setSuccessMsg('¡Anime actualizado correctamente!');
+        setSuccessMsg(`¡Actualizado correctamente${assignedId ? ` con ID #${assignedId}` : ''}!`);
       } else {
         await api.addCustomAnime(payload);
-        setSuccessMsg('¡Anime añadido correctamente al catálogo!');
+        setSuccessMsg(`¡Añadido correctamente al catálogo${assignedId ? ` con ID oficial #${assignedId} (sin custom)` : ''}!`);
       }
 
       setAnimeForm({
+        custom_id: '',
         title: '',
         image: '',
         description: '',
@@ -646,10 +690,11 @@ const Admin = () => {
       });
       setEpisodeNames({});
       setEditingAnimeId(null);
+      setTmdbSearchResults([]);
       
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (e) {
-      alert('Error al guardar el anime.');
+      alert('Error al guardar el anime. Verifica que el ID no esté duplicado.');
     } finally {
       setIsSubmitting(false);
     }
@@ -658,6 +703,7 @@ const Admin = () => {
   const handleCancelEdit = () => {
     setEditingAnimeId(null);
     setAnimeForm({
+      custom_id: '',
       title: '',
       image: '',
       description: '',
@@ -667,6 +713,7 @@ const Admin = () => {
       genres: []
     });
     setEpisodeNames({});
+    setTmdbSearchResults([]);
   };
 
   if (!isVerified) {
@@ -932,8 +979,10 @@ const Admin = () => {
 
       {activeTab === 'animes' && (
         <div>
-          <h2>Crear Anime Personalizado</h2>
-          <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>Estos animes se añadirán directamente a tu base de datos y aparecerán en la búsqueda (a menos que sean secretos).</p>
+          <h2>{editingAnimeId ? `Editar Contenido (${editingAnimeId})` : 'Crear Película, Serie o Anime en el Catálogo'}</h2>
+          <p style={{ color: '#9ca3af', marginBottom: '1.5rem' }}>
+            Puedes buscar y autocompletar desde TMDB o asignarle directamente su <strong>TMDB ID oficial</strong> desde antes (ej: <code>10191</code> para <em>Cómo entrenar a tu dragón 1</em>) para que <strong>NO</strong> se guarde como <code>custom-...</code>.
+          </p>
           
           {successMsg && (
             <div style={{ background: '#059669', color: 'white', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -941,10 +990,124 @@ const Admin = () => {
             </div>
           )}
 
+          {/* BUSCADOR RÁPIDO TMDB PARA AUTOCOMPLETAR ID, PORTADA, SINOPSIS Y GÉNEROS */}
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.75rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: '#38bdf8', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+              <Sparkles size={18} /> Buscar en TMDB para Asignar ID Oficial y Autocompletar (Opcional)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr auto', gap: '0.75rem', alignItems: 'center' }}>
+              <select
+                className={styles.input}
+                value={tmdbSearchType}
+                onChange={(e) => setTmdbSearchType(e.target.value)}
+                style={{ margin: 0 }}
+              >
+                <option value="movie">🎬 Película</option>
+                <option value="tv">📺 Serie / Anime</option>
+                <option value="multi">🌐 Todos</option>
+              </select>
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="Escribe título o TMDB ID (Ej: Cómo entrenar a tu dragón o 10191)..."
+                value={tmdbSearchQuery}
+                onChange={(e) => setTmdbSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearchTmdbForForm(e);
+                  }
+                }}
+                style={{ margin: 0 }}
+              />
+              <button
+                type="button"
+                onClick={handleSearchTmdbForForm}
+                disabled={isSearchingTmdb}
+                className={styles.submitBtn}
+                style={{ width: 'auto', padding: '0.7rem 1.25rem', margin: 0, background: '#0284c7' }}
+              >
+                {isSearchingTmdb ? 'Buscando...' : 'Buscar TMDB'}
+              </button>
+            </div>
+
+            {tmdbSearchResults.length > 0 && (
+              <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
+                {tmdbSearchResults.map(item => (
+                  <div
+                    key={`${item.media_type}-${item.id}`}
+                    style={{
+                      display: 'flex',
+                      gap: '0.75rem',
+                      background: '#1f2937',
+                      border: '1px solid #374151',
+                      borderRadius: '0.6rem',
+                      padding: '0.65rem',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <img
+                      src={item.image || 'https://via.placeholder.com/80x120?text=No+Img'}
+                      alt={item.title}
+                      style={{ width: '54px', height: '80px', objectFit: 'cover', borderRadius: '0.35rem', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f9fafb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.title}>
+                        {item.title}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
+                        {item.typeLabel} {item.year ? `• ${item.year}` : ''}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 700, marginTop: '2px' }}>
+                        ID: {item.id}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTmdbResult(item)}
+                        style={{
+                          marginTop: '6px',
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.35rem',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Usar este (ID #{item.id})
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <form onSubmit={handleAddCustomAnime}>
-            <div className={styles.formGroup}>
-              <label>Título del Anime</label>
-              <input type="text" name="title" className={styles.input} value={animeForm.title} onChange={handleAnimeChange} required placeholder="Ej: Link Click (Donghua)" />
+            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1rem' }}>
+              <div className={styles.formGroup}>
+                <label>ID Asignado / TMDB ID</label>
+                <input
+                  type="text"
+                  name="custom_id"
+                  className={styles.input}
+                  value={animeForm.custom_id}
+                  onChange={handleAnimeChange}
+                  placeholder="Ej: 10191 (vacío = custom-...)"
+                />
+                <span style={{ display: 'block', marginTop: '4px', fontSize: '0.75rem', color: animeForm.custom_id && !String(animeForm.custom_id).startsWith('custom-') ? '#4ade80' : '#9ca3af' }}>
+                  {animeForm.custom_id && !String(animeForm.custom_id).startsWith('custom-')
+                    ? `✅ Se guardará con ID oficial: ${animeForm.custom_id} (No será custom)`
+                    : 'Si lo dejas vacío se asignará custom-... automáticamente'}
+                </span>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Título (Película, Serie o Anime)</label>
+                <input type="text" name="title" className={styles.input} value={animeForm.title} onChange={handleAnimeChange} required placeholder="Ej: Cómo entrenar a tu dragón" />
+              </div>
             </div>
 
             <div className={styles.formGroup}>
@@ -1243,6 +1406,7 @@ const Admin = () => {
                 <thead>
                   <tr>
                     <th>Portada</th>
+                    <th>ID / TMDB</th>
                     <th>Título</th>
                     <th>Episodios</th>
                     <th>Estado</th>
@@ -1251,10 +1415,25 @@ const Admin = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {customAnimes.map(anime => (
+                  {customAnimes.map(anime => {
+                    const isCustomId = String(anime.id || '').startsWith('custom-');
+                    return (
                     <tr key={anime.id}>
                       <td>
                         <img src={anime.image} alt={anime.title} style={{ width: '40px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                      </td>
+                      <td>
+                        <span style={{
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          background: isCustomId ? '#374151' : '#065f46',
+                          color: isCustomId ? '#9ca3af' : '#6ee7b7',
+                          border: isCustomId ? '1px solid #4b5563' : '1px solid #10b981'
+                        }}>
+                          {isCustomId ? anime.id : `TMDB: ${anime.id}`}
+                        </span>
                       </td>
                       <td>{anime.title}</td>
                       <td>{anime.totalEpisodes}</td>
@@ -1284,7 +1463,8 @@ const Admin = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
