@@ -4239,12 +4239,18 @@ export const api = {
              const uniqueEps = [];
              const seen = new Set();
              for (const ep of scrapedEps) {
-                if (!seen.has(ep.episode_number)) {
-                    seen.add(ep.episode_number);
+                 const key = String(ep.season_number || 1) + "-" + String(ep.episode_number);
+                if (!seen.has(key)) {
+                    seen.add(key);
                     uniqueEps.push(ep);
                 }
              }
-             uniqueEps.sort((a,b) => a.episode_number - b.episode_number);
+             uniqueEps.sort((a, b) => {
+                const sa = Number(a.season_number || 1);
+                const sb = Number(b.season_number || 1);
+                if (sa !== sb) return sa - sb;
+                return Number(a.episode_number) - Number(b.episode_number);
+             });
 
              let absCount = 1;
 
@@ -4334,23 +4340,31 @@ export const api = {
         }
       } catch (e) { console.error("Error al consultar Supabase episodios", e); }
 
-      // Si ya tiene episodios registrados en Supabase (anime_episodes), construir directamente desde dbEps deduplicados
+      // Si ya tiene episodios registrados en Supabase (anime_episodes), construir directamente desde dbEps deduplicados por temporada y episodio
       if (dbEps.length > 0) {
-        const byEpNum = new Map();
+        const byEpKey = new Map();
         for (const ep of dbEps) {
+          const sNum = Number(ep.season_number || 1);
           const epNum = Number(ep.episode_number);
-          const existing = byEpNum.get(epNum);
+          const key = `${sNum}-${epNum}`;
+          const existing = byEpKey.get(key);
           if (!existing || (!existing.episode_name && ep.episode_name) || (/^Episodio\s+\d+$/i.test(existing.episode_name || '') && ep.episode_name && !/^Episodio\s+\d+$/i.test(ep.episode_name))) {
-            byEpNum.set(epNum, ep);
+            byEpKey.set(key, ep);
           }
         }
-        const sortedUnique = Array.from(byEpNum.values()).sort((a, b) => a.episode_number - b.episode_number);
+        const sortedUnique = Array.from(byEpKey.values()).sort((a, b) => {
+          const sa = Number(a.season_number || 1);
+          const sb = Number(b.season_number || 1);
+          if (sa !== sb) return sa - sb;
+          return Number(a.episode_number) - Number(b.episode_number);
+        });
         return sortedUnique.map((ep, idx) => ({
           id: ep.episode_number,
           tmdb_episode_id: ep.episode_number,
           title: ep.episode_name || `Episodio ${ep.episode_number}`,
           url: ep.episode_number,
           season: ep.season_number || 1,
+          season_number: ep.season_number || 1,
           absolute_id: idx + 1
         }));
       }
@@ -4443,46 +4457,80 @@ export const api = {
     let serversData = [];
 
     try {
-      // 1. Prioridad: Buscar por anime_tmdb_id si está provisto (ej. '671', '941', 'custom-...')
+      // 1. Prioridad: Buscar por anime_tmdb_id si está provisto (ej. '671', '941', '108978', 'custom-...')
       if (animeId) {
         const idStr = String(animeId).trim();
-        let q = supabase.from('anime_episodes').select('*').eq('anime_tmdb_id', idStr);
-        // Si no es un ID custom y episodeId > 1, podemos verificar episode_number
-        if (!idStr.startsWith('custom-')) {
-          q = q.eq('episode_number', episodeId);
+
+        // 1a. Si hay seasonNumber, buscar específicamente esa temporada y episodio
+        if (seasonNumber) {
+          const { data: bySeasonData } = await supabase
+            .from('anime_episodes')
+            .select('*')
+            .eq('anime_tmdb_id', idStr)
+            .eq('season_number', seasonNumber)
+            .eq('episode_number', episodeId)
+            .order('created_at', { ascending: false });
+
+          if (bySeasonData && bySeasonData.length > 0) {
+            serversData = bySeasonData;
+          }
         }
-        const { data: byIdData } = await q.order('created_at', { ascending: false });
-        if (byIdData && byIdData.length > 0) {
-          serversData = byIdData;
-        } else if (!idStr.startsWith('custom-')) {
-          // Si no encontró con episode_number específico para película, probar sin filtro de episode_number
-          const { data: anyById } = await supabase.from('anime_episodes').select('*').eq('anime_tmdb_id', idStr);
-          if (anyById && anyById.length > 0) {
-            serversData = anyById;
+
+        // 1b. Fallback por episode_number general
+        if (serversData.length === 0) {
+          let q = supabase.from('anime_episodes').select('*').eq('anime_tmdb_id', idStr);
+          if (!idStr.startsWith('custom-')) {
+            q = q.eq('episode_number', episodeId);
+          }
+          const { data: byIdData } = await q.order('created_at', { ascending: false });
+          if (byIdData && byIdData.length > 0) {
+            serversData = byIdData;
+          } else if (!idStr.startsWith('custom-')) {
+            // Si no encontró con episode_number específico para película, probar sin filtro de episode_number
+            const { data: anyById } = await supabase.from('anime_episodes').select('*').eq('anime_tmdb_id', idStr);
+            if (anyById && anyById.length > 0) {
+              serversData = anyById;
+            }
           }
         }
       }
 
-      // 2. Prioridad: Buscar por search_title clásico con episode_number (la serie o anime real)
+      // 2. Prioridad: Buscar por search_title clásico con season_number y episode_number
       if (serversData.length === 0 && cleanTitle) {
-        const { data: bySearchTitle } = await supabase
-          .from('anime_episodes')
-          .select('*')
-          .ilike('search_title', cleanTitle)
-          .eq('episode_number', episodeId)
-          .order('created_at', { ascending: false });
-
-        if (bySearchTitle && bySearchTitle.length > 0) {
-          serversData = bySearchTitle;
-        } else if (shortTitle && shortTitle !== cleanTitle) {
-          const { data: byShortSearch } = await supabase
+        if (seasonNumber) {
+          const { data: byTitleSeason } = await supabase
             .from('anime_episodes')
             .select('*')
-            .ilike('search_title', shortTitle)
+            .ilike('search_title', cleanTitle)
+            .eq('season_number', seasonNumber)
             .eq('episode_number', episodeId)
             .order('created_at', { ascending: false });
-          if (byShortSearch && byShortSearch.length > 0) {
-            serversData = byShortSearch;
+
+          if (byTitleSeason && byTitleSeason.length > 0) {
+            serversData = byTitleSeason;
+          }
+        }
+
+        if (serversData.length === 0) {
+          const { data: bySearchTitle } = await supabase
+            .from('anime_episodes')
+            .select('*')
+            .ilike('search_title', cleanTitle)
+            .eq('episode_number', episodeId)
+            .order('created_at', { ascending: false });
+
+          if (bySearchTitle && bySearchTitle.length > 0) {
+            serversData = bySearchTitle;
+          } else if (shortTitle && shortTitle !== cleanTitle) {
+            const { data: byShortSearch } = await supabase
+              .from('anime_episodes')
+              .select('*')
+              .ilike('search_title', shortTitle)
+              .eq('episode_number', episodeId)
+              .order('created_at', { ascending: false });
+            if (byShortSearch && byShortSearch.length > 0) {
+              serversData = byShortSearch;
+            }
           }
         }
       }
@@ -4524,20 +4572,30 @@ export const api = {
       }
 
       if (serversData.length > 0) {
-        let servers = serversData.map(lat => ({
-          name: lat.server_name,
-          description: `Servidor Oficial (${(lat.language || 'SUB').toUpperCase()})`,
-          url: lat.video_url,
-          color: lat.server_name.includes('FILEMOON') ? '#3b82f6' : 
-                 lat.server_name.includes('EARNVIDS') ? '#10b981' : 
-                 lat.server_name.includes('STREAMWISH') ? '#8b5cf6' : 
-                 lat.server_name.includes('ZOPLAYER') ? '#f59e0b' : '#64748b',
-          icon: 'S',
-          lang: lat.language || 'sub',
-          skip_start: lat.skip_start || null,
-          skip_end: lat.skip_end || null,
-          outro_start: lat.outro_start || null
-        }));
+        let servers = serversData.map(lat => {
+          const rawLang = String(lat.language || 'sub').toLowerCase().trim();
+          let normalizedLang = 'sub';
+          if (rawLang.includes('lat') || rawLang === 'es' || rawLang === 'español' || rawLang === 'spanish') normalizedLang = 'latino';
+          else if (rawLang.includes('cast')) normalizedLang = 'castellano';
+          else if (rawLang.includes('sub') || rawLang.includes('jap') || rawLang === 'ja') normalizedLang = 'sub';
+          else if (rawLang === 'none') normalizedLang = 'none';
+          else normalizedLang = rawLang;
+
+          return {
+            name: lat.server_name,
+            description: `Servidor Oficial (${normalizedLang.toUpperCase()})`,
+            url: lat.video_url,
+            color: lat.server_name.includes('FILEMOON') ? '#3b82f6' : 
+                   lat.server_name.includes('EARNVIDS') ? '#10b981' : 
+                   lat.server_name.includes('STREAMWISH') ? '#8b5cf6' : 
+                   lat.server_name.includes('ZOPLAYER') ? '#f59e0b' : '#64748b',
+            icon: 'S',
+            lang: normalizedLang,
+            skip_start: lat.skip_start || null,
+            skip_end: lat.skip_end || null,
+            outro_start: lat.outro_start || null
+          };
+        });
 
         return servers.filter((server, index, self) =>
           index === self.findIndex((t) => t.url === server.url)
@@ -4555,6 +4613,34 @@ export const api = {
       icon: 'X',
       lang: 'none'
     }];
+  },
+
+  // Obtener Idiomas de Audio Disponibles (Latino, Castellano, Sub) para la ficha
+  getAnimeLanguages: async (animeId, animeTitle) => {
+    try {
+      const strId = String(animeId || '').trim();
+      let query = supabase.from('anime_episodes').select('language');
+      if (strId && !strId.startsWith('custom-')) {
+        query = query.eq('anime_tmdb_id', strId);
+      } else if (animeTitle) {
+        query = query.ilike('search_title', animeTitle.trim());
+      }
+      const { data } = await query.limit(100);
+      if (data && data.length > 0) {
+        const langs = new Set();
+        data.forEach(r => {
+          const raw = String(r.language || '').toLowerCase().trim();
+          if (raw.includes('lat') || raw === 'es' || raw === 'español' || raw === 'spanish') langs.add('Latino');
+          else if (raw.includes('cast')) langs.add('Castellano');
+          else if (raw.includes('sub') || raw.includes('jap') || raw === 'ja') langs.add('Subtitulado');
+          else if (raw && raw !== 'none') langs.add(raw.charAt(0).toUpperCase() + raw.slice(1));
+        });
+        return Array.from(langs);
+      }
+    } catch (e) {
+      console.error('Error fetching anime languages:', e);
+    }
+    return [];
   },
 
   // Obtener Información de Saga o Colección Vinculada (Harry Potter, Arma Mortal, etc.)

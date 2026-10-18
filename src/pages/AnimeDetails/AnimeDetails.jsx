@@ -28,6 +28,7 @@ const AnimeDetails = () => {
   const { showToast, showConfirm } = useUI();
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [availableLanguages, setAvailableLanguages] = useState([]);
   const [showListModal, setShowListModal] = useState(false);
 
   useEffect(() => {
@@ -54,6 +55,8 @@ const AnimeDetails = () => {
       await new Promise(r => setTimeout(r, 200));
       const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
       const sInfo = await api.getSagaInfo(info?.id || id, info?.title);
+      const langs = await api.getAnimeLanguages(info?.id || id, info?.title);
+      setAvailableLanguages(langs || []);
       
       setAnimeInfo(info);
       setEpisodes(eps);
@@ -232,6 +235,27 @@ const AnimeDetails = () => {
           
           <div className={styles.meta}>
             <span className={styles.status}>{animeInfo.status}</span>
+            {availableLanguages && availableLanguages.length > 0 && (
+              <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center', marginLeft: '0.5rem', flexWrap: 'wrap' }}>
+                {availableLanguages.map(lang => (
+                  <span 
+                    key={lang} 
+                    style={{
+                      background: lang === 'Latino' ? 'rgba(34, 197, 94, 0.2)' : lang === 'Castellano' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                      color: lang === 'Latino' ? '#4ade80' : lang === 'Castellano' ? '#facc15' : '#60a5fa',
+                      border: `1px solid ${lang === 'Latino' ? 'rgba(34, 197, 94, 0.4)' : lang === 'Castellano' ? 'rgba(234, 179, 8, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`,
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      letterSpacing: '0.02em'
+                    }}
+                  >
+                    🔊 {lang}
+                  </span>
+                ))}
+              </div>
+            )}
             <button 
               className={`${styles.favoriteToggle} ${isFavorite ? styles.isFavorite : ''}`}
               onPointerDown={startPress}
@@ -469,7 +493,7 @@ const AnimeDetails = () => {
                 
                 return (
                   <Link 
-                    to={`/watch/${animeInfo.id}/${ep.id}`} 
+                    to={`/watch/${animeInfo.id}/${ep.id}?season=${ep.season || ep.season_number || activeSeason}`} 
                     key={ep.id}
                     className={`glass-panel ${styles.episodeCard} ${isEpWatched ? styles.episodeWatched : ''}`}
                     title={displayTitle}

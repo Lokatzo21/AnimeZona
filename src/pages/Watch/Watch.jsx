@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import Hls from 'hls.js';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,30 +8,64 @@ import { List, ChevronLeft, ChevronRight, Play, Lightbulb, Cast, EyeOff, SkipFor
 import styles from './Watch.module.css';
 
 const PRIORITY_ORDER = [
+  'RUMBLE',
+  'ARCHIVE',
+  '1080P',
+  'FULL HD',
+  'FHD',
+  '4K',
   'ZONAAPS',
+  'ZOPLAYER',
   'CINEBEL',
   'MULTI-AUDIO',
   'MULTI - AUDIO',
-  'ARCHIVE',
-  'EARNVIDS',
   'VIMEO',
+  'VIMEOS',
   'GOODSTREAM',
+  'EARNVIDS',
   'STREAMWISH',
-  'UQLOAD',
   'FILEMOON',
+  'UQLOAD',
   'FILELIONS',
   'VOE',
+  'SAVEFILES',
+  'VIDARA',
+  'GUPLOAD',
+  'DOODSTREAM',
+  'DOOD',
+  'MIXDROP',
+  'MXDROP',
   'VIDEOAPP'
 ];
+
+const getQualityWeight = (srv) => {
+  const name = (srv?.name || '').toUpperCase();
+  const url = (srv?.url || '').toUpperCase();
+  const filename = url.split('/').pop() || '';
+  const text = `${name} ${filename}`;
+  if (/(?:^|\b)(?:4K|2160P?)(?:\b|$)/i.test(text)) return 4;
+  if (/(?:^|\b)(?:1080P?|FHD|FULL\s*HD)(?:\b|$)/i.test(text)) return 3;
+  if (/(?:^|\b)(?:720P?|HD)(?:\b|$)/i.test(text)) return 2;
+  if (/(?:^|\b)(?:480P?|SD)(?:\b|$)/i.test(text)) return 1;
+  return 0;
+};
 
 const sortServersByPriority = (srvList) => {
   if (!Array.isArray(srvList)) return [];
   return [...srvList].sort((a, b) => {
-    const isA_mp4 = a.url?.includes('.mp4') || a.name?.toUpperCase().includes('CINEBEL');
-    const isB_mp4 = b.url?.includes('.mp4') || b.name?.toUpperCase().includes('CINEBEL');
+    // 1. MP4 directos SIEMPRE primero (#1)
+    const isA_mp4 = a.url?.includes('.mp4');
+    const isB_mp4 = b.url?.includes('.mp4');
     if (isA_mp4 && !isB_mp4) return -1;
     if (!isA_mp4 && isB_mp4) return 1;
 
+    // 2. Streams HLS adaptativos (.m3u8) de segundo (#2)
+    const isA_hls = a.url?.includes('.m3u8');
+    const isB_hls = b.url?.includes('.m3u8');
+    if (isA_hls && !isB_hls) return -1;
+    if (!isA_hls && isB_hls) return 1;
+
+    // 3. Prioridad de servidor (RUMBLE / ARCHIVE / 1080P > ZONAAPS > CINEBEL > IFRAMES)
     const aName = a.name?.toUpperCase() || '';
     const bName = b.name?.toUpperCase() || '';
     const ai = PRIORITY_ORDER.findIndex(p => aName.includes(p));
@@ -40,12 +75,51 @@ const sortServersByPriority = (srvList) => {
     const bRank = bi === -1 ? 999 : bi;
 
     if (aRank !== bRank) return aRank - bRank;
+
+    // 3. Resolución/Calidad (1080p > 720p > 480p) si comparten el mismo nivel de servidor
+    const aQual = getQualityWeight(a);
+    const bQual = getQualityWeight(b);
+    if (aQual !== bQual) return bQual - aQual;
+
     return aName.localeCompare(bName);
   });
 };
 
+const normalizeLang = (lang) => {
+  if (!lang) return 'sub';
+  const l = String(lang).toLowerCase().trim();
+  if (l.includes('lat') || l === 'es' || l === 'español' || l === 'spanish') return 'latino';
+  if (l.includes('cast')) return 'castellano';
+  if (l.includes('sub') || l.includes('jap') || l === 'ja') return 'sub';
+  if (l === 'none') return 'none';
+  return l;
+};
+
 const Watch = () => {
   const { id, episode } = useParams();
+  const [searchParams] = useSearchParams();
+  const querySeason = searchParams.get('season') ? parseInt(searchParams.get('season'), 10) : null;
+  const stallTimeoutRef = useRef(null);
+
+  const handleVideoWaiting = () => {
+    if (stallTimeoutRef.current) clearTimeout(stallTimeoutRef.current);
+    // Recuperación inteligente de buffer para Smart TVs (Samsung Tizen / LG webOS)
+    stallTimeoutRef.current = setTimeout(() => {
+      const vid = nativeVideoRef.current;
+      if (vid && !vid.paused && vid.readyState < 3) {
+        console.warn('Smart TV video stall detectado: desatorando buffer...');
+        vid.currentTime += 0.05;
+        vid.play().catch(() => {});
+      }
+    }, 2500);
+  };
+
+  const handleVideoPlaying = () => {
+    if (stallTimeoutRef.current) {
+      clearTimeout(stallTimeoutRef.current);
+      stallTimeoutRef.current = null;
+    }
+  };
   
   useEffect(() => {
     if (!window.chrome || !window.chrome.cast) {
@@ -107,8 +181,10 @@ const Watch = () => {
   const sidebarListRef = useRef(null);
   const activeEpisodeRef = useRef(null);
   const nativeVideoRef = useRef(null);
+  const hlsInstanceRef = useRef(null);
   const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
+  const [playbackError, setPlaybackError] = useState(false);
   const currentEp = episodes.find(ep => String(ep?.id ?? '') === String(episode ?? ''));
   const currentSeason = currentEp ? (currentEp.season || 1) : 1;
 
@@ -195,6 +271,63 @@ const Watch = () => {
         .finally(() => setFbLoading(false));
     }
   }, [activeServer]);
+
+  // Handle HLS (.m3u8) streams or MP4 native playback
+  useEffect(() => {
+    setPlaybackError(false);
+    if (hlsInstanceRef.current) {
+      hlsInstanceRef.current.destroy();
+      hlsInstanceRef.current = null;
+    }
+
+    const streamUrl = activeServer?.url;
+    if (!streamUrl) return;
+
+    if (streamUrl.includes('.m3u8')) {
+      const video = nativeVideoRef.current;
+      if (video) {
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            maxBufferLength: 30,
+            enableWorker: true
+          });
+          hls.loadSource(streamUrl);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(e => console.log('Autoplay deferred:', e));
+          });
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+              console.warn('HLS fatal error:', data.type);
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  setPlaybackError(true);
+                  hls.destroy();
+                  break;
+              }
+            }
+          });
+          hlsInstanceRef.current = hls;
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = streamUrl;
+          video.play().catch(e => console.log('Autoplay deferred:', e));
+        }
+      }
+    }
+
+    return () => {
+      if (hlsInstanceRef.current) {
+        hlsInstanceRef.current.destroy();
+        hlsInstanceRef.current = null;
+      }
+    };
+  }, [activeServer?.url]);
 
   const changeQuality = (qKey, url) => {
     if (nativeVideoRef.current) {
@@ -455,23 +588,35 @@ const Watch = () => {
   useEffect(() => {
     const fetchServers = async () => {
       if (animeInfo) {
-        const currentEp = episodes.find(ep => ep.id.toString() === episode.toString());
-        const seasonNumber = currentEp ? currentEp.season : 1;
-        const correctEpisodeId = currentEp ? currentEp.id : episode;
+        const currentEp = episodes.find(ep => {
+          const matchesEp = ep.id?.toString() === episode.toString() || ep.episode_number?.toString() === episode.toString();
+          if (querySeason) {
+            return matchesEp && (ep.season === querySeason || ep.season_number === querySeason);
+          }
+          return matchesEp;
+        });
+        const seasonNumber = querySeason || (currentEp ? (currentEp.season || currentEp.season_number) : 1);
+        const correctEpisodeId = currentEp ? (currentEp.episode_number || currentEp.id) : episode;
         
         // Obtenemos todos los servidores (de todos los idiomas) para este episodio
         const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, 'sub', animeInfo.id, seasonNumber);
 
+        const normalizedServers = (serversData || []).map(s => ({
+          ...s,
+          lang: normalizeLang(s.lang)
+        }));
+
         // Ordenar todos los servidores por la prioridad oficial
-        const sortedServers = sortServersByPriority(serversData);
+        const sortedServers = sortServersByPriority(normalizedServers);
         setServers(sortedServers);
 
         // Intentar seleccionar un idioma disponible preferido (LAT > SUB > CAST)
-        const availableLangs = [...new Set(sortedServers.map(s => s.lang))];
+        const availableLangs = [...new Set(sortedServers.map(s => s.lang).filter(l => l && l !== 'none'))];
         let defaultLang = 'sub';
         if (availableLangs.includes('latino')) defaultLang = 'latino';
         else if (availableLangs.includes('sub')) defaultLang = 'sub';
-        else if (availableLangs.length > 0 && availableLangs[0] !== 'none') defaultLang = availableLangs[0];
+        else if (availableLangs.includes('castellano')) defaultLang = 'castellano';
+        else if (availableLangs.length > 0) defaultLang = availableLangs[0];
 
         setLanguage(defaultLang);
 
@@ -552,8 +697,9 @@ const Watch = () => {
 
   // Handler para cuando el usuario cambia de idioma manualmente
   const handleLanguageChange = (newLang) => {
-      setLanguage(newLang);
-      const langServers = sortServersByPriority(servers.filter(s => s.lang === newLang || s.lang === 'none'));
+      const norm = normalizeLang(newLang);
+      setLanguage(norm);
+      const langServers = sortServersByPriority(servers.filter(s => normalizeLang(s.lang) === norm || s.lang === 'none'));
       if (langServers.length > 0) {
           setActiveServer(langServers[0]);
       }
@@ -589,10 +735,11 @@ const Watch = () => {
   }
 
   // Filtrar servidores a mostrar según el idioma seleccionado y orden de prioridad oficial
-  const visibleServers = sortServersByPriority(
-    servers.filter(s => s.lang === language || s.lang === 'none')
-  );
-  const availableLanguages = [...new Set(servers.map(s => s.lang).filter(l => l !== 'none'))];
+  const curLang = normalizeLang(language);
+  const matchedServers = servers.filter(s => normalizeLang(s.lang) === curLang || s.lang === 'none');
+  const visibleServers = sortServersByPriority(matchedServers.length > 0 ? matchedServers : servers);
+  const availableLanguages = [...new Set(servers.map(s => normalizeLang(s.lang)).filter(l => l && l !== 'none'))];
+
   return (
     <div className={styles.watchContainer}>
       <div className={styles.header}>
@@ -609,30 +756,22 @@ const Watch = () => {
             <div className={styles.languageSelector}>
               <span className={styles.langLabel}>Idioma:</span>
               <div className={styles.langButtons}>
-                {availableLanguages.includes('latino') && (
+                {availableLanguages.map(l => {
+                  let label = 'Subtitulado';
+                  if (l === 'latino') label = 'Latino';
+                  else if (l === 'castellano') label = 'Castellano';
+                  else label = l.charAt(0).toUpperCase() + l.slice(1);
+
+                  return (
                     <button 
-                      className={`${styles.langBtn} ${language === 'latino' ? styles.langActive : ''}`} 
-                      onClick={() => handleLanguageChange('latino')}
+                      key={l}
+                      className={`${styles.langBtn} ${curLang === l ? styles.langActive : ''}`} 
+                      onClick={() => handleLanguageChange(l)}
                     >
-                      Latino
+                      {label}
                     </button>
-                )}
-                {availableLanguages.includes('sub') && (
-                    <button 
-                      className={`${styles.langBtn} ${language === 'sub' ? styles.langActive : ''}`} 
-                      onClick={() => handleLanguageChange('sub')}
-                    >
-                      Subtitulado
-                    </button>
-                )}
-                {availableLanguages.includes('castellano') && (
-                    <button 
-                      className={`${styles.langBtn} ${language === 'castellano' ? styles.langActive : ''}`} 
-                      onClick={() => handleLanguageChange('castellano')}
-                    >
-                      Castellano
-                    </button>
-                )}
+                  );
+                })}
               </div>
             </div>
         )}
@@ -643,7 +782,7 @@ const Watch = () => {
             {visibleServers.map((server, idx) => (
               <button 
                 key={idx} 
-                className={`${styles.serverBtn} ${activeServer?.name === server.name ? styles.serverActive : ''}`} 
+                className={`${styles.serverBtn} ${(activeServer?.url ? activeServer.url === server.url : activeServer?.name === server.name) ? styles.serverActive : ''}`} 
                 onClick={() => setActiveServer(server)}
               >
                 <Play size={16} />
@@ -669,15 +808,20 @@ const Watch = () => {
                       <>
                         <video 
                           ref={nativeVideoRef}
+                          key={resolvedFbUrl}
                           src={resolvedFbUrl} 
                           controls={controlsVisible}
                           playsInline
+                          webkit-playsinline="true"
+                          x-webkit-airplay="allow"
                           preload="metadata"
                           poster={animeInfo?.image || ''}
                           className={styles.iframe}
                           onLoadedMetadata={handleVideoLoaded}
                           onTimeUpdate={handleTimeUpdate}
                           onPause={handleTimeUpdate}
+                          onWaiting={handleVideoWaiting}
+                          onPlaying={handleVideoPlaying}
                           onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                         ></video>
                         
@@ -709,22 +853,75 @@ const Watch = () => {
                     ) : (
                       <div className={styles.loadingServer}>Hubo un error extrayendo el video de Facebook. URL recibida: {activeServer.url}</div>
                     )
-                  ) : activeServer?.url?.includes('.mp4') ? (
+                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8')) ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
-                        src={activeServer.url} 
+                        key={activeServer.url}
+                        src={activeServer.url?.includes('.m3u8') ? undefined : activeServer.url} 
                         controls={controlsVisible}
                         playsInline
+                        webkit-playsinline="true"
+                        x-webkit-airplay="allow"
                         preload="metadata"
                         poster={animeInfo?.image || ''}
                         className={styles.iframe}
                         onLoadedMetadata={handleVideoLoaded}
                         onTimeUpdate={handleTimeUpdate}
                         onPause={handleTimeUpdate}
+                        onWaiting={handleVideoWaiting}
+                        onPlaying={() => { setPlaybackError(false); handleVideoPlaying(); }}
+                        onError={(e) => {
+                          console.warn("Video stream load error:", e);
+                          // Don't show error if it's already playing or if hls handles it
+                          if (!activeServer?.url?.includes('.m3u8')) {
+                            setPlaybackError(true);
+                          }
+                        }}
                         onDoubleClick={handleDoubleClick}
-                        onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
+                        onClick={() => { if(!controlsVisible) { nativeVideoRef.current?.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                       ></video>
+                      {playbackError && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: 'rgba(0,0,0,0.85)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 10,
+                          color: '#fff',
+                          padding: '20px',
+                          textAlign: 'center'
+                        }}>
+                          <p style={{fontSize: '1.2rem', marginBottom: '15px'}}>No se pudo cargar el stream directamente.</p>
+                          <button 
+                            onClick={() => {
+                              setPlaybackError(false);
+                              if (nativeVideoRef.current) {
+                                nativeVideoRef.current.load();
+                                nativeVideoRef.current.play().catch(console.error);
+                              }
+                            }}
+                            style={{
+                              background: '#ff3d00',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '10px 24px',
+                              borderRadius: '8px',
+                              fontSize: '1rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Reintentar Reproducción
+                          </button>
+                        </div>
+                      )}
                       
                       {showSkipIntro && (
                         <button onClick={skipIntro} className={styles.skipIntroBtn}>

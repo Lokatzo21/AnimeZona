@@ -33,10 +33,12 @@ class ScraperManager {
     }
 
     if (!this.browser) {
-      global.logToUI('Iniciando navegador (Edge/Chrome)...', 'info');
+      global.logToUI('Iniciando navegador (Brave/Edge/Chrome)...', 'info');
       
       let executablePath = null;
       const chromePaths = [
+        'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+        'C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
@@ -79,14 +81,14 @@ class ScraperManager {
              });
 
              const url = page.url();
-             if (url && url !== 'about:blank' && !url.includes('cinebel') && !url.includes('animeonline')) {
+             if (url && url !== 'about:blank' && !url.includes('cinebel') && !url.includes('animeonline') && !url.includes('clickdoki') && !url.includes('API-cutty')) {
                 await page.close();
              }
              // Si el popup carga después, lo atrapamos en 'framenavigated'
              page.on('framenavigated', async (frame) => {
                 if (frame === page.mainFrame()) {
                    const fUrl = frame.url();
-                   if (fUrl !== 'about:blank' && !fUrl.includes('cinebel') && !fUrl.includes('animeonline')) {
+                   if (fUrl !== 'about:blank' && !fUrl.includes('cinebel') && !fUrl.includes('animeonline') && !fUrl.includes('clickdoki') && !fUrl.includes('API-cutty')) {
                        await page.close();
                    }
                 }
