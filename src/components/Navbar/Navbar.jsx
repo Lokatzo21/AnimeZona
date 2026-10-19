@@ -111,7 +111,7 @@ const Navbar = () => {
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
               <input 
                 type="text" 
-                placeholder="Buscar animes..." 
+                placeholder="Buscar animes, series, películas..." 
                 className={styles.searchInput}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -160,7 +160,7 @@ const Navbar = () => {
                     </div>
                   ))
                 ) : (
-                  <div className={styles.searchLoading}>No se encontraron animes.</div>
+                  <div className={styles.searchLoading}>No se encontraron resultados.</div>
                 )}
               </div>
             )}
@@ -173,7 +173,7 @@ const Navbar = () => {
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input 
                 type="text" 
-                placeholder="Buscar animes..." 
+                placeholder="Buscar animes, series, películas..." 
                 className={styles.searchInput}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -229,7 +229,7 @@ const Navbar = () => {
                     </div>
                   ))
                 ) : (
-                  <div className={styles.searchLoading}>No se encontraron animes.</div>
+                  <div className={styles.searchLoading}>No se encontraron resultados.</div>
                 )}
               </div>
             )}

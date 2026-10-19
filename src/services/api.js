@@ -3344,7 +3344,7 @@ const DB_CATALOG_ITEMS = {
   }
 };
 
-const RECENT_CATALOG_IDS = ["1311031","2432","447365","283995","118340","241842","157239","232230","95557","106379","279471","224372","92749","100088","84958","969681","944","943","942","941","49529","10661","333339","274870","1040330","939243","675353","454626","597","718789","26264","10603","950396","80274","72545","88751","109418","38365","50546","172385","46195","1735","1734","564","27022","324786","588228","158852","561","950387","1011985","140300","49444","9502","10052","1087192","638507","166428","82702","10191","357096","207768","43947","1011477","38575","1425045","254128","240832","10771","2698","310","512200","353486","1234821","507086","351286","135397","331","330","329","6589","273477","44833","1038392","423108","259693","138843","311324","14161","278154","57800","8355","950","425","585083","400155","159824","76492","12445","12444","675","674","673","672","671","572802","297802","187017","64688","615656","345940","226362","291339","95350","228878","202411","533533","1062722","480042","440471","107846","550","1265609","718930","9313","614933","1007734","1242898","278624","127529","76479","80752","85271","88396","88329","87739","87108","91557","60059","1396","70523","40075","52814","200875","1084242","18","207468","222766","272472","250307","243503","223365","254793","299982","533535","212996","285889","125988","166426","5920","209867","205050","1865","285","58","22","338953","338952","259316","767","110070","127532","86031","279182","249907","235758","281615","277881","258901","196950","278043","214310","271607","207332","217407"];
+const RECENT_CATALOG_IDS = ["1311031","2432","447365","283995","118340","241842","157239","232230","95557","106379","279471","224372","92749","100088","84958","969681","944","943","942","941","49529","10661","333339","274870","1040330","939243","675353","454626","597","718789","26264","10603","950396","80274","72545","88751","109418","38365","50546","172385","46195","1735","1734","564","27022","324786","588228","158852","561","950387","1011985","140300","49444","9502","10052","1087192","638507","166428","82702","10191","357096","207768","43947","1011477","38575","1425045","254128","240832","10771","2698","310","512200","353486","1234821","507086","351286","135397","331","330","329","6589","273477","44833","1038392","423108","259693","138843","311324","14161","278154","57800","8355","950","425","585083","400155","159824","76492","12445","12444","675","674","673","672","671","572802","297802","187017","64688","615656","345940","226362","291339","95350","228878","202411","533533","1062722","480042","440471","107846","550","1265609","718930","9313","614933","1007734","1242898","278624","127529","76479","80752","85271","88396","88329","87739","87108","91557","60059","1396","70523","40075","52814","200875","1084242","18","207468","222766","272472","250307","243503","223365","254793","275202","533535","212996","285889","125988","166426","5920","209867","205050","1865","285","58","22","338953","338952","259316","767","110070","127532","86031","279182","249907","235758","281615","277881","258901","196950","278043","214310","271607","207332","217407"];
 const buildOrderedCatalogList = () => {
   const ordered = [];
   const seen = new Set();
@@ -3367,36 +3367,68 @@ let DB_CATALOG_LIST = buildOrderedCatalogList();
 
 const dedupeCatalogList = (items) => {
   const seenIds = new Set();
+  const titleToCustomIndex = new Map();
   const seenTitles = new Set();
   const result = [];
+
   for (const item of items) {
     if (!item || !item.id) continue;
     const idStr = String(item.id).trim();
+    if (seenIds.has(idStr)) continue;
+
+    const isNumericId = /^\d+$/.test(idStr);
     const titleNorm = (item.title || '').trim().toLowerCase();
     const altNorm = (item.searchTitle || '').trim().toLowerCase();
     const isMulti = Number(item.totalEpisodes || item.total_episodes || 1) > 1;
     const suffix = isMulti ? 'multi' : 'single';
     const titleKey = titleNorm ? `${titleNorm}__${suffix}` : '';
     const altKey = altNorm ? `${altNorm}__${suffix}` : '';
-    if (seenIds.has(idStr) || (titleKey && seenTitles.has(titleKey)) || (altKey && seenTitles.has(altKey))) continue;
-    seenIds.add(idStr);
-    if (titleKey) seenTitles.add(titleKey);
-    if (altKey) seenTitles.add(altKey);
-    result.push(item);
+
+    if (!isNumericId) {
+      // Es un custom (custom-...)
+      // Si ya vimos un item oficial con este título, ignorar este custom
+      if ((titleKey && seenTitles.has(titleKey)) || (altKey && seenTitles.has(altKey))) {
+        continue;
+      }
+      if (titleKey) titleToCustomIndex.set(titleKey, result.length);
+      if (altKey) titleToCustomIndex.set(altKey, result.length);
+      seenIds.add(idStr);
+      result.push(item);
+    } else {
+      // Es un ID oficial de TMDB (numérico)
+      // Si antes se había agregado un custom con este mismo título, reemplazarlo por el oficial
+      const prevCustomIdx = (titleKey && titleToCustomIndex.get(titleKey)) ?? (altKey && titleToCustomIndex.get(altKey));
+      if (prevCustomIdx !== undefined && result[prevCustomIdx]) {
+        seenIds.delete(String(result[prevCustomIdx].id).trim());
+        result[prevCustomIdx] = item;
+        seenIds.add(idStr);
+        if (titleKey) seenTitles.add(titleKey);
+        if (altKey) seenTitles.add(altKey);
+        continue;
+      }
+
+      seenIds.add(idStr);
+      if (titleKey) seenTitles.add(titleKey);
+      if (altKey) seenTitles.add(altKey);
+      result.push(item);
+    }
   }
-  return result;
+  return result.filter(Boolean);
 };
 
 // Cargar elementos auto-descubiertos desde localStorage al iniciar
-const AUTO_CATALOG_STORAGE_KEY = 'az_auto_catalog_v2';
+const AUTO_CATALOG_STORAGE_KEY = 'az_auto_catalog_v3';
 try {
   if (typeof localStorage !== 'undefined') {
+    // Limpiar claves obsoletas o versiones previas
+    localStorage.removeItem('az_auto_catalog_v2');
     const savedAuto = localStorage.getItem(AUTO_CATALOG_STORAGE_KEY);
     if (savedAuto) {
       const parsedAuto = JSON.parse(savedAuto);
       if (parsedAuto && typeof parsedAuto === 'object') {
+        delete parsedAuto['299982']; // Limpiar ID erróneo
         for (const [k, val] of Object.entries(parsedAuto)) {
-          if (val && val.id && !DB_CATALOG_ITEMS[k]) {
+          if (val && val.id && !DB_CATALOG_ITEMS[k] && k !== '299982') {
             DB_CATALOG_ITEMS[k] = val;
             DB_CATALOG_LIST.unshift(val);
           }
@@ -3565,7 +3597,13 @@ const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
           continue;
         }
 
-        if ((idStr && customIds.has(idStr)) || customTitles.has(sTitleNorm) || existingTitles.has(sTitleNorm)) {
+        // Si es un custom que ya está cargado en customAnimes, omitir para no duplicar
+        if (idStr && idStr.startsWith('custom-') && customIds.has(idStr)) {
+          continue;
+        }
+
+        // Si no tiene anime_tmdb_id (se insertó en SQL sin ID), omitir si ya existe en catálogo
+        if (!idStr && (customTitles.has(sTitleNorm) || existingTitles.has(sTitleNorm))) {
           continue;
         }
 
@@ -4129,10 +4167,12 @@ export const api = {
         return queryWords.every(word => titleLower.includes(word));
       });
 
-      const url = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(query)}&include_adult=false`;
-      const data = await fetchWithDelay(url);
-      const animes = data.results.filter(item => item.original_language === 'ja');
-      return dedupeCatalogList([...matchedCustom, ...animes.map(mapAnimeData)]);
+      const multiUrl = `${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(query)}&include_adult=false`;
+      const data = await fetchWithDelay(multiUrl);
+      const tmdbHits = (data?.results || [])
+        .filter(item => (item.media_type === 'tv' || item.media_type === 'movie') && !isEcchiOrNSFW(item))
+        .map(mapAnimeData);
+      return dedupeCatalogList([...matchedCustom, ...tmdbHits]);
     } catch (error) {
       console.error('Error searching anime:', error);
       return [];
@@ -4154,14 +4194,17 @@ export const api = {
         return queryWords.every(w => titleLower.includes(w) || descLower.includes(w));
       });
 
-      if (typeFilter && typeFilter !== 'todos') {
-        matchedCustom = matchedCustom.filter(ca => ca.contentType === typeFilter);
+      // Si el usuario especificó un tipo, respetarlo pero sin bloquear series occidentales o películas
+      if (typeFilter === 'peliculas') {
+        matchedCustom = matchedCustom.filter(ca => ca.contentType === 'peliculas');
+      } else if (typeFilter === 'series') {
+        matchedCustom = matchedCustom.filter(ca => ca.contentType === 'series');
       }
       if (genreName && genreName !== 'Todos') {
         matchedCustom = matchedCustom.filter(ca => ca.genres && ca.genres.includes(genreName));
       }
 
-      // 2. Buscar en TMDB según el tipo
+      // 2. Buscar en TMDB según el tipo (sin restringir por idioma japonés 'ja')
       let tmdbResults = [];
 
       if (typeFilter === 'peliculas') {
@@ -4171,17 +4214,9 @@ export const api = {
       } else if (typeFilter === 'series') {
         const tvUrl = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(cleanQ)}&include_adult=false`;
         const data = await fetchWithDelay(tvUrl);
-        tmdbResults = (data.results || [])
-          .filter(item => item.original_language !== 'ja')
-          .map(mapAnimeData);
-      } else if (typeFilter === 'animes') {
-        const tvUrl = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(cleanQ)}&include_adult=false`;
-        const data = await fetchWithDelay(tvUrl);
-        tmdbResults = (data.results || [])
-          .filter(item => item.original_language === 'ja')
-          .map(mapAnimeData);
+        tmdbResults = (data.results || []).map(mapAnimeData);
       } else {
-        // 'todos': Buscar en paralelo tanto películas como series/anime
+        // 'todos' y 'animes': Buscar tanto películas como series en TMDB sin filtrar por 'ja'
         const movieUrl = `${BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(cleanQ)}&include_adult=false`;
         const tvUrl = `${BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=es-MX&query=${encodeURIComponent(cleanQ)}&include_adult=false`;
         const [movieRes, tvRes] = await Promise.all([
