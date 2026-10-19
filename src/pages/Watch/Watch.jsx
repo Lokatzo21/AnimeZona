@@ -234,6 +234,12 @@ const Watch = () => {
         skip_end: times.skip_end,
         outro_start: times.outro_start
       }));
+      setServers(prev => prev.map(s => ({
+        ...s,
+        skip_start: times.skip_start,
+        skip_end: times.skip_end,
+        outro_start: times.outro_start
+      })));
       setShowAdminPanel(false);
     } else {
       alert("Error al guardar los tiempos.");
@@ -977,7 +983,7 @@ const Watch = () => {
                 <span>{cinemaMode ? 'Encender luz' : 'Apagar luz'}</span>
               </button>
               
-              {(activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
+              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
                 <>
                   <button onClick={handleDoubleClick} className={styles.toolbarBtn} title="Pantalla Completa">
                     <Maximize size={18} />
@@ -1011,7 +1017,7 @@ const Watch = () => {
                 </>
               )}
 
-              {isAdmin && (activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+              {isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
                 <button 
                   onClick={() => setShowAdminPanel(!showAdminPanel)} 
                   className={styles.toolbarBtn} 
@@ -1022,7 +1028,7 @@ const Watch = () => {
               )}
             </div>
 
-            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
               <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-dark-secondary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid #ef4444' }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#f8fafc', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>⚙️</span> Panel de Control Admin - Tiempos
