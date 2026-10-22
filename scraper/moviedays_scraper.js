@@ -1070,8 +1070,12 @@ async function resolveClickDoki(browserRef, cuttyUrl) {
       await delay(1000);
     }
 
-    // 3) Paso 1: Resolver Captcha (espera hasta 90 segundos al usuario si es necesario)
-    for (let w = 0; w < 90; w++) {
+    // 3) Paso 1: Resolver Captcha (espera al usuario pacientemente sin interferir si requiere selección manual)
+    let hasAttemptedInitialClick = false;
+    let manualNoticeShown = false;
+    const maxWaitSeconds = 240; // 4 minutos de espera para que el usuario no tenga ninguna prisa
+
+    for (let w = 0; w < maxWaitSeconds; w++) {
       if (capturedDirectMp4) break;
 
       const curUrl = clickPage.url();
@@ -1080,19 +1084,27 @@ async function resolveClickDoki(browserRef, cuttyUrl) {
         break;
       }
 
-      // Intentar marcar checkbox de reCAPTCHA si está visible y no resuelto
-      for (const frame of clickPage.frames()) {
-        try {
-          if (frame.url().includes('recaptcha')) {
-            const anchor = await frame.$('#recaptcha-anchor');
-            if (anchor) {
-              const checked = await frame.evaluate(el => el.getAttribute('aria-checked'), anchor);
-              if (checked !== 'true') {
-                await anchor.click().catch(() => {});
+      // Intentar marcar checkbox de reCAPTCHA SOLO UNA VEZ para intentar resolución automática.
+      // Si no pasa solo (aparece selector de imágenes), NO volver a hacer clic en el anchor
+      // para que NO parpadee, no se reinicie ni se cierre ("quite y pone").
+      if (!hasAttemptedInitialClick) {
+        for (const frame of clickPage.frames()) {
+          try {
+            if (frame.url().includes('recaptcha')) {
+              const anchor = await frame.$('#recaptcha-anchor');
+              if (anchor) {
+                const checked = await frame.evaluate(el => el.getAttribute('aria-checked'), anchor);
+                if (checked !== 'true') {
+                  await delay(600);
+                  await anchor.click().catch(() => {});
+                  hasAttemptedInitialClick = true;
+                  await delay(1200);
+                  break;
+                }
               }
             }
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
       }
 
       const captchaState = await clickPage.evaluate(() => {
@@ -1120,6 +1132,13 @@ async function resolveClickDoki(browserRef, cuttyUrl) {
         }).catch(() => {});
         await delay(2000);
         break;
+      }
+
+      // Si ya intentamos el clic inicial y requiere selección manual de imágenes, avisar y esperar en silencio sin tocar nada
+      if (hasAttemptedInitialClick && !manualNoticeShown) {
+        console.log(`   [🧩] Se requiere resolver el captcha en Brave.`);
+        console.log(`   👉 Selecciona las imágenes en la ventana de Brave. El scraper esperará pacientemente a que termines sin interrumpirte.`);
+        manualNoticeShown = true;
       }
 
       await delay(1000);
@@ -1845,6 +1864,9 @@ async function runMovieDaysScraper() {
               consecutiveEmptyOrBroken = 0;
               totalEpisodesSavedInRun++;
             }
+
+            console.log(`\n   [☕] Pausa preventiva de 4 segundos antes del siguiente episodio para evitar bloqueos/captchas...`);
+            await delay(4000);
 
             epInSeason++;
           }
