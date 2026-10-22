@@ -141,11 +141,18 @@ const Navbar = () => {
                     <div 
                       key={anime.id} 
                       className={styles.searchResultItem}
+                      tabIndex={0}
+                      role="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleResultClick(anime.id);
+                      }}
                       onClick={() => handleResultClick(anime.id)}
                     >
                       <div className={styles.imageWrapper}>
                         <img src={anime.image} alt={anime.title} className={styles.searchResultImage} />
                         <button 
+                          type="button"
+                          tabIndex={-1}
                           className={`${styles.searchFavBtn} ${favoriteAnimes.some(a => a.id === anime.id) ? styles.isFav : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -177,7 +184,16 @@ const Navbar = () => {
                 className={styles.searchInput}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e) => {
+                  handleKeyDown(e);
+                  if (e.key === 'ArrowDown') {
+                    const firstResult = document.querySelector(`.${styles.searchResults} [tabindex="0"]`);
+                    if (firstResult) {
+                      e.preventDefault();
+                      firstResult.focus();
+                    }
+                  }
+                }}
               />
               {searchQuery.length > 0 && (
                 <button 
@@ -203,11 +219,18 @@ const Navbar = () => {
                     <div 
                       key={anime.id} 
                       className={styles.searchResultItem}
+                      tabIndex={0}
+                      role="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleResultClick(anime.id);
+                      }}
                       onClick={() => handleResultClick(anime.id)}
                     >
                       <div className={styles.imageWrapper}>
                         <img src={anime.image} alt={anime.title} className={styles.searchResultImage} />
                         <button 
+                          type="button"
+                          tabIndex={-1}
                           className={`${styles.searchFavBtn} ${favoriteAnimes.some(a => a.id === anime.id) ? styles.isFav : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -220,6 +243,8 @@ const Navbar = () => {
                       </div>
                       <span className={styles.searchResultTitle}>{anime.title}</span>
                       <button 
+                        type="button"
+                        tabIndex={-1}
                         className={styles.searchHideBtn}
                         onClick={(e) => handleHideResult(e, anime)}
                         title="Ocultar Recomendación"

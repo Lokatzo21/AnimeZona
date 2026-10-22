@@ -3417,11 +3417,12 @@ const dedupeCatalogList = (items) => {
 };
 
 // Cargar elementos auto-descubiertos desde localStorage al iniciar
-const AUTO_CATALOG_STORAGE_KEY = 'az_auto_catalog_v3';
+const AUTO_CATALOG_STORAGE_KEY = 'az_auto_catalog_v4';
 try {
   if (typeof localStorage !== 'undefined') {
-    // Limpiar claves obsoletas o versiones previas
+    // Limpiar claves obsoletas o versiones previas con datos erróneos
     localStorage.removeItem('az_auto_catalog_v2');
+    localStorage.removeItem('az_auto_catalog_v3');
     const savedAuto = localStorage.getItem(AUTO_CATALOG_STORAGE_KEY);
     if (savedAuto) {
       const parsedAuto = JSON.parse(savedAuto);
@@ -3441,6 +3442,57 @@ try {
 let lastDynamicSyncTime = 0;
 let dynamicSyncPromise = null;
 
+// Clasificador inteligente de contenido: desambigua entre Película, Serie Occidental y Anime
+export const resolveMediaClassification = (row, movData, tvData) => {
+  const sTitleNorm = (row.search_title || '').toLowerCase().trim();
+  const hasMultipleEps = Number(row.total_episodes) > 1 || Number(row.max_season) > 1;
+
+  if (!movData && !tvData) return null;
+  if (movData && !tvData) return { data: movData, isMovie: true };
+  if (!movData && tvData) return { data: tvData, isMovie: false };
+
+  const movTitle = (movData.title || movData.original_title || '').toLowerCase().trim();
+  const tvTitle = (tvData.name || tvData.original_name || '').toLowerCase().trim();
+
+  const movMatch = movTitle && (sTitleNorm.includes(movTitle) || movTitle.includes(sTitleNorm));
+  const tvMatch = tvTitle && (sTitleNorm.includes(tvTitle) || tvTitle.includes(sTitleNorm));
+
+  const movVotes = Number(movData.vote_count || 0);
+  const tvVotes = Number(tvData.vote_count || 0);
+
+  // 1. Si pertenece a una colección de películas oficial en TMDB (ej: Harry Potter, Arma Mortal, etc.)
+  if (movData.belongs_to_collection && movVotes > 500) {
+    return { data: movData, isMovie: true };
+  }
+
+  // 2. Si el título de la película coincide y el de la serie no
+  if (movMatch && !tvMatch) {
+    return { data: movData, isMovie: true };
+  }
+
+  // 3. Si el título de la serie coincide y el de la película no
+  if (tvMatch && !movMatch) {
+    return { data: tvData, isMovie: false };
+  }
+
+  // 4. Si uno tiene una cantidad abrumadora de votos sobre el otro (ej. Harry Potter 24k vs Testigo 1 voto)
+  if (movVotes > 1000 && tvVotes < 100) {
+    return { data: movData, isMovie: true };
+  }
+  if (tvVotes > 1000 && movVotes < 100) {
+    return { data: tvData, isMovie: false };
+  }
+
+  // 5. Si tiene múltiples episodios y temporadas reales de TV y la serie tiene votos respetables
+  if (hasMultipleEps && tvVotes > 50 && Number(tvData.number_of_seasons || 1) >= 1 && !movData.belongs_to_collection) {
+    return { data: tvData, isMovie: false };
+  }
+
+  // 6. Por defecto según votos y relevancia
+  const isMov = movVotes >= tvVotes;
+  return { data: isMov ? movData : tvData, isMovie: isMov };
+};
+
 const mapDynamicTmdbItem = (tmdbData, isMovie, row) => {
   const movieGenreLookup = {
     16: 'Animación',
@@ -3454,7 +3506,8 @@ const mapDynamicTmdbItem = (tmdbData, isMovie, row) => {
     10759: 'Action & Adventure',
     10765: 'Sci-Fi & Fantasy'
   };
-  const isAnime = !isMovie && tmdbData.original_language === 'ja';
+  // Solo se clasifica como Anime si es estrictamente japonés (idioma japonés o país de origen Japón)
+  const isAnime = !isMovie && (tmdbData.original_language === 'ja' || (Array.isArray(tmdbData.origin_country) && tmdbData.origin_country.includes('JP')));
   const mappedGenres = new Set();
   if (Array.isArray(tmdbData.genres)) {
     tmdbData.genres.forEach(g => {
@@ -3507,7 +3560,7 @@ const mapDynamicTmdbItem = (tmdbData, isMovie, row) => {
 const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
   const now = Date.now();
   if (dynamicSyncPromise) return dynamicSyncPromise;
-  if (now - lastDynamicSyncTime < 20000) return;
+  if (now - lastDynamicSyncTime < 5000) return;
 
   dynamicSyncPromise = (async () => {
     try {
@@ -3581,7 +3634,7 @@ const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
         const sTitleNorm = (row.search_title || '').toLowerCase().trim();
         if (!sTitleNorm) continue;
 
-        // Si ya existe en DB_CATALOG_ITEMS, actualizar conteo de episodios/temporadas si creció
+        // Si ya existe en DB_CATALOG_ITEMS, actualizar conteo y corregir clasificación
         if (idStr && DB_CATALOG_ITEMS[idStr]) {
           const item = DB_CATALOG_ITEMS[idStr];
           if (!item.searchTitle && row.search_title) item.searchTitle = row.search_title;
@@ -3607,7 +3660,7 @@ const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
           continue;
         }
 
-        // Nuevo elemento detectado en anime_episodes: resolver vía TMDB
+        // Nuevo elemento detectado en anime_episodes: resolver vía TMDB con clasificación robusta
         try {
           const hasMultipleEps = Number(row.total_episodes) > 1 || Number(row.max_season) > 1;
           let resolvedItem = null;
@@ -3618,24 +3671,9 @@ const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
               fetch(`${BASE_URL}/movie/${idStr}?api_key=${TMDB_API_KEY}&language=es-MX`).then(r => r.ok ? r.json() : null).catch(() => null)
             ]);
 
-            const tvTitle = (tvData?.name || tvData?.original_name || '').toLowerCase().trim();
-            const movTitle = (movData?.title || movData?.original_title || '').toLowerCase().trim();
-            const tvMatch = tvTitle && (sTitleNorm.includes(tvTitle) || tvTitle.includes(sTitleNorm));
-            const movMatch = movTitle && (sTitleNorm.includes(movTitle) || movTitle.includes(sTitleNorm));
-
-            if (hasMultipleEps && tvData && tvData.id) {
-              resolvedItem = mapDynamicTmdbItem(tvData, false, row);
-            } else if (tvData && tvData.id && tvMatch && !movMatch) {
-              resolvedItem = mapDynamicTmdbItem(tvData, false, row);
-            } else if (movData && movData.id && movMatch && !tvMatch && !hasMultipleEps) {
-              resolvedItem = mapDynamicTmdbItem(movData, true, row);
-            } else if (tvData && tvData.id && movData && movData.id) {
-              const isMov = !hasMultipleEps && Number(movData.vote_count || 0) > Number(tvData.vote_count || 0) * 2;
-              resolvedItem = mapDynamicTmdbItem(isMov ? movData : tvData, isMov, row);
-            } else if (tvData && tvData.id) {
-              resolvedItem = mapDynamicTmdbItem(tvData, false, row);
-            } else if (movData && movData.id) {
-              resolvedItem = mapDynamicTmdbItem(movData, true, row);
+            const resolved = resolveMediaClassification(row, movData, tvData);
+            if (resolved) {
+              resolvedItem = mapDynamicTmdbItem(resolved.data, resolved.isMovie, row);
             }
           } else {
             // Buscar por título en TMDB si se insertó en SQL Editor sin anime_tmdb_id
@@ -3901,10 +3939,11 @@ export const api = {
      return dedupeCatalogList([...DB_CATALOG_LIST, ...customAnimes]);
   },
 
-  // Inicio - Populares (Trending)
+  // Inicio - Populares (Trending Anime)
   getTrendingAnime: async () => {
     try {
-      const catalogAnimes = await api.getCatalogAnimes(false);
+      const allCatalog = await api.getCatalogAnimes(false);
+      const catalogAnimes = allCatalog.filter(a => a.contentType === 'animes' || (!a.isMovie && a.genres?.includes('Animación') && a.contentType !== 'series'));
       const url1 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=1&include_adult=false`;
       const url2 = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=popularity.desc&page=2&include_adult=false`;
       const [res1, res2] = await Promise.all([ fetchWithDelay(url1), fetchWithDelay(url2) ]);
@@ -3919,7 +3958,8 @@ export const api = {
   // Inicio - Top Anime
   getTopAnime: async () => {
     try {
-      const catalogAnimes = await api.getCatalogAnimes(false);
+      const allCatalog = await api.getCatalogAnimes(false);
+      const catalogAnimes = allCatalog.filter(a => a.contentType === 'animes' || (!a.isMovie && a.genres?.includes('Animación') && a.contentType !== 'series'));
       const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=500&page=1&include_adult=false`;
       const data = await fetchWithDelay(url);
       return dedupeCatalogList([...catalogAnimes.slice(0, 8), ...data.results.map(mapAnimeData)]);
@@ -3929,10 +3969,41 @@ export const api = {
     }
   },
 
+  // Inicio - Series Populares (Series Occidentales y Globales)
+  getTrendingSeries: async () => {
+    try {
+      const allCatalog = await api.getCatalogAnimes(false);
+      const catalogSeries = allCatalog.filter(a => a.contentType === 'series');
+      const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&without_original_language=ja&sort_by=popularity.desc&page=1&include_adult=false`;
+      const data = await fetchWithDelay(url);
+      const mapped = (data?.results || []).map(mapAnimeData);
+      return dedupeCatalogList([...catalogSeries, ...mapped]);
+    } catch (error) {
+      console.error('Error fetching trending series:', error);
+      return [];
+    }
+  },
+
+  // Inicio - Películas y Sagas
+  getTrendingMovies: async () => {
+    try {
+      const allCatalog = await api.getCatalogAnimes(false);
+      const catalogMovies = allCatalog.filter(a => a.contentType === 'peliculas' || a.isMovie);
+      const url = `${BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&language=es-MX&sort_by=popularity.desc&page=1&include_adult=false`;
+      const data = await fetchWithDelay(url);
+      const mapped = (data?.results || []).map(item => mapAnimeData({ ...item, media_type: 'movie' }));
+      return dedupeCatalogList([...catalogMovies, ...mapped]);
+    } catch (error) {
+      console.error('Error fetching trending movies:', error);
+      return [];
+    }
+  },
+
   // Inicio - Recientes
   getRecentAnime: async () => {
     try {
-      const catalogAnimes = await api.getCatalogAnimes(false);
+      const allCatalog = await api.getCatalogAnimes(false);
+      const catalogAnimes = allCatalog.filter(a => a.contentType === 'animes');
       const url = `${BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&language=es-MX&with_original_language=ja&sort_by=first_air_date.desc&page=1&include_adult=false`;
       const data = await fetchWithDelay(url);
       return dedupeCatalogList([...catalogAnimes, ...data.results.map(mapAnimeData)]);
@@ -4063,46 +4134,19 @@ export const api = {
             fetchWithDelay(`${BASE_URL}/movie/${strId}?api_key=${TMDB_API_KEY}&language=es-MX&append_to_response=videos`).catch(() => null)
           ]);
 
-          const tvTitle = (tvData?.name || tvData?.original_name || '').trim().toLowerCase();
-          const movieTitle = (movieData?.title || movieData?.original_title || '').trim().toLowerCase();
+          const resolved = resolveMediaClassification({
+            search_title: row.search_title || '',
+            total_episodes: 1,
+            max_season: 1
+          }, movieData, tvData);
 
-          const tvMatchesSearch = tvTitle && (searchClean.includes(tvTitle) || tvTitle.includes(searchClean));
-          const movieMatchesSearch = movieTitle && (searchClean.includes(movieTitle) || movieTitle.includes(searchClean) || epNameClean.includes(movieTitle) || movieTitle.includes(epNameClean));
-
-          // Si coincide la serie de TV (ej. Lucky), devolver TV
-          if (tvData && tvData.id && tvMatchesSearch && !movieMatchesSearch) {
-            return mapAnimeData(tvData);
-          }
-
-          // Si coincide la Película (ej. saga Harry Potter), devolver Película enriquecida
-          if (movieData && movieData.id && movieMatchesSearch && !tvMatchesSearch) {
-            const mapped = mapAnimeData({ ...movieData, media_type: 'movie' });
-            mapped.saga_collection_title = row.search_title;
-            mapped.saga_episode_name = row.episode_name;
-            mapped.saga_episode_number = row.episode_number;
-            return mapped;
-          }
-
-          // Si ambos o ninguno coinciden por nombre, comparar por votos/popularidad
-          if (tvData && tvData.id && movieData && movieData.id) {
-            const tvVotes = Number(tvData.vote_count || 0);
-            const movieVotes = Number(movieData.vote_count || 0);
-            if (movieVotes > tvVotes * 3) {
-              const mapped = mapAnimeData({ ...movieData, media_type: 'movie' });
+          if (resolved) {
+            const mapped = mapAnimeData({ ...resolved.data, media_type: resolved.isMovie ? 'movie' : 'tv' });
+            if (resolved.isMovie) {
               mapped.saga_collection_title = row.search_title;
               mapped.saga_episode_name = row.episode_name;
               mapped.saga_episode_number = row.episode_number;
-              return mapped;
             }
-            return mapAnimeData(tvData);
-          }
-
-          if (tvData && tvData.id) return mapAnimeData(tvData);
-          if (movieData && movieData.id) {
-            const mapped = mapAnimeData({ ...movieData, media_type: 'movie' });
-            mapped.saga_collection_title = row.search_title;
-            mapped.saga_episode_name = row.episode_name;
-            mapped.saga_episode_number = row.episode_number;
             return mapped;
           }
         }
@@ -4134,18 +4178,15 @@ export const api = {
         movieData = await fetchWithDelay(movieUrl);
       } catch {}
 
-      if (tvData && movieData) {
-        // Comparar votos y relevancia: por ejemplo Harry Potter (27k votos) vs Moolah Beach (1 voto)
-        const movieVotes = Number(movieData.vote_count || 0);
-        const tvVotes = Number(tvData.vote_count || 0);
-        if (movieVotes > tvVotes * 5) {
-          return mapAnimeData({ ...movieData, media_type: 'movie' });
-        }
-        return mapAnimeData(tvData);
-      }
+      const fallbackResolved = resolveMediaClassification({
+        search_title: '',
+        total_episodes: 1,
+        max_season: 1
+      }, movieData, tvData);
 
-      if (tvData) return mapAnimeData(tvData);
-      if (movieData) return mapAnimeData({ ...movieData, media_type: 'movie' });
+      if (fallbackResolved) {
+        return mapAnimeData({ ...fallbackResolved.data, media_type: fallbackResolved.isMovie ? 'movie' : 'tv' });
+      }
 
       return null;
     } catch (error) {

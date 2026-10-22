@@ -19,6 +19,7 @@ const TYPE_OPTIONS = [
 ];
 
 let catalogCache = {};
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos para asegurar frescura
 
 const Catalog = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -83,7 +84,8 @@ const Catalog = () => {
   // Reiniciar estado o cargar de caché cuando cambia el tipo o género
   useEffect(() => {
     const cached = catalogCache[cacheKey];
-    if (cached) {
+    const isExpired = cached && (Date.now() - (cached.timestamp || 0) > CACHE_TTL_MS);
+    if (cached && !isExpired) {
       setCatalog(cached.catalog);
       setPage(cached.page);
       setHasMore(cached.hasMore);
@@ -109,6 +111,7 @@ const Catalog = () => {
         catalog,
         page,
         hasMore,
+        timestamp: Date.now(),
         scrollY: catalogCache[cacheKey]?.scrollY || window.scrollY
       };
     }
@@ -244,6 +247,15 @@ const Catalog = () => {
             className={styles.catalogSearchInput}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' || e.key === 'Enter') {
+                const firstCardLink = document.querySelector(`.${styles.grid} a`);
+                if (firstCardLink) {
+                  e.preventDefault();
+                  firstCardLink.focus();
+                }
+              }
+            }}
             placeholder={
               selectedType === 'peliculas'
                 ? 'Buscar películas y sagas (ej: Deadpool, Harry Potter, Arma Mortal)...'
@@ -315,9 +327,9 @@ const Catalog = () => {
         <SkeletonGrid count={12} />
       ) : (
         <div className={styles.grid}>
-          {filteredCatalog.map(anime => (
+          {filteredCatalog.map((anime, idx) => (
             <AnimeCard 
-              key={`catalog-${anime.id}`}
+              key={`catalog-${anime.id}-${anime.type || ''}-${idx}`}
               anime={anime}
               isFavorite={favoriteAnimes.some(a => String(typeof a === 'object' ? a.id : a) === String(anime.id))}
               onToggleFavorite={handleToggleFavorite}

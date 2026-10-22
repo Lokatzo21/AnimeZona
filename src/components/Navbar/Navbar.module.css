@@ -125,10 +125,14 @@
   padding: 0.5rem 1rem;
   cursor: pointer;
   transition: var(--transition-fast);
+  outline: none;
 }
 
-.searchResultItem:hover {
-  background: rgba(107, 33, 168, 0.2);
+.searchResultItem:hover,
+.searchResultItem:focus,
+.searchResultItem:focus-visible {
+  background: rgba(168, 85, 247, 0.25);
+  box-shadow: inset 3px 0 0 #c084fc;
 }
 
 .imageWrapper {

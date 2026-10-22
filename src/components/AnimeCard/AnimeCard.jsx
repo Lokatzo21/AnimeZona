@@ -108,7 +108,13 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
 
   return (
     <div className={styles.card} onContextMenu={handleContextMenu} onMouseLeave={handleMouseLeave}>
-      <Link to={linkTo} state={{ anime }} className={styles.imageContainer}>
+      <Link 
+        to={linkTo} 
+        state={{ anime }} 
+        className={styles.imageContainer}
+        tabIndex={0}
+        aria-label={anime.title}
+      >
         <img 
           src={anime.image} 
           alt={anime.title} 
@@ -121,6 +127,8 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
         />
         {onRemoveContinue && (
           <button 
+            type="button"
+            tabIndex={-1}
             className={styles.removeContinueBtn}
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemoveContinue(anime.id); }}
             title="Quitar de Continuar Viendo"
@@ -132,6 +140,8 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
           <Play className={styles.playIcon} size={40} />
           {onHide && !confirmHide && !isContinueWatching && (
             <button 
+              type="button"
+              tabIndex={-1}
               className={styles.overlayActionBtn} 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmHide(true); }}
             >
@@ -142,13 +152,15 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
             <div className={styles.confirmHideContainer} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
               <span className={styles.confirmText}>¿Seguro?</span>
               <div className={styles.confirmButtons}>
-                <button className={styles.confirmBtn} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onHide(anime); }}>Sí</button>
-                <button className={styles.cancelBtn} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmHide(false); }}>No</button>
+                <button type="button" tabIndex={-1} className={styles.confirmBtn} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onHide(anime); }}>Sí</button>
+                <button type="button" tabIndex={-1} className={styles.cancelBtn} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmHide(false); }}>No</button>
               </div>
             </div>
           )}
           {onRestore && (
             <button 
+              type="button"
+              tabIndex={-1}
               className={`${styles.overlayActionBtn} ${styles.restoreBtn}`} 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRestore(anime); }}
             >
@@ -161,6 +173,8 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
               {anime.genres.slice(0, 3).map((g, idx) => (
                 <button 
                   key={idx} 
+                  type="button"
+                  tabIndex={-1}
                   className={styles.tagBtn}
                   onClick={(e) => handleTagClick(e, g)}
                 >
@@ -202,6 +216,8 @@ const AnimeCard = ({ anime, isFavorite, isWatched, onToggleFavorite, onToggleWat
         <div className={styles.actions}>
           {onToggleFavorite !== undefined && (
             <button 
+              type="button"
+              tabIndex={-1}
               className={`${styles.favoriteBtn} ${isFavorite ? styles.isFavorite : ''}`}
               onPointerDown={startPress}
               onPointerUp={cancelPress}

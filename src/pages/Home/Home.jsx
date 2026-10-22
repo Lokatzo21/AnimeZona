@@ -7,25 +7,28 @@ import { api, isEcchiOrNSFW } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './Home.module.css';
 
+const HOME_CACHE_TTL = 3 * 60 * 1000;
+
 const Home = () => {
-  const [topAnime, setTopAnime] = useState(() => {
+  const getCachedData = (key) => {
     try {
-      const c = localStorage.getItem('anime_cached_home_top');
-      return c ? JSON.parse(c) : [];
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.data) && Date.now() - (parsed.time || 0) < HOME_CACHE_TTL) {
+        return parsed.data;
+      }
+      return [];
     } catch { return []; }
-  });
-  const [allTimeAnime, setAllTimeAnime] = useState(() => {
-    try {
-      const c = localStorage.getItem('anime_cached_home_trending');
-      return c ? JSON.parse(c) : [];
-    } catch { return []; }
-  });
+  };
+
+  const [topAnime, setTopAnime] = useState(() => getCachedData('anime_cached_home_top_v2'));
+  const [allTimeAnime, setAllTimeAnime] = useState(() => getCachedData('anime_cached_home_trending_v2'));
+  const [trendingSeries, setTrendingSeries] = useState(() => getCachedData('anime_cached_home_series_v2'));
+  const [trendingMovies, setTrendingMovies] = useState(() => getCachedData('anime_cached_home_movies_v2'));
+
   const [loading, setLoading] = useState(() => {
-    try {
-      const c1 = localStorage.getItem('anime_cached_home_top');
-      const c2 = localStorage.getItem('anime_cached_home_trending');
-      return !(c1 && c2 && JSON.parse(c1).length > 0);
-    } catch { return true; }
+    return topAnime.length === 0 && allTimeAnime.length === 0;
   });
   
   // Local storage para animes favoritos y ocultos
@@ -37,21 +40,31 @@ const Home = () => {
     let isMounted = true;
     const fetchHomeData = async () => {
       try {
-        // Ejecutar llamadas concurrentemente en paralelo sin demoras innecesarias
-        const [top, allTime] = await Promise.all([
+        // Ejecutar llamadas concurrentemente en paralelo sin demoras
+        const [top, allTime, series, movies] = await Promise.all([
           api.getTopAnime(),
-          api.getTrendingAnime()
+          api.getTrendingAnime(),
+          api.getTrendingSeries(),
+          api.getTrendingMovies()
         ]);
         
         if (!isMounted) return;
 
         if (Array.isArray(top) && top.length > 0) {
           setTopAnime(top);
-          try { localStorage.setItem('anime_cached_home_top', JSON.stringify(top)); } catch {}
+          try { localStorage.setItem('anime_cached_home_top_v2', JSON.stringify({ data: top, time: Date.now() })); } catch {}
         }
         if (Array.isArray(allTime) && allTime.length > 0) {
           setAllTimeAnime(allTime);
-          try { localStorage.setItem('anime_cached_home_trending', JSON.stringify(allTime)); } catch {}
+          try { localStorage.setItem('anime_cached_home_trending_v2', JSON.stringify({ data: allTime, time: Date.now() })); } catch {}
+        }
+        if (Array.isArray(series) && series.length > 0) {
+          setTrendingSeries(series);
+          try { localStorage.setItem('anime_cached_home_series_v2', JSON.stringify({ data: series, time: Date.now() })); } catch {}
+        }
+        if (Array.isArray(movies) && movies.length > 0) {
+          setTrendingMovies(movies);
+          try { localStorage.setItem('anime_cached_home_movies_v2', JSON.stringify({ data: movies, time: Date.now() })); } catch {}
         }
       } catch (err) {
         console.error('Error fetching home data:', err);
@@ -245,13 +258,47 @@ const Home = () => {
 
       {/* Carrusel de Favoritos (Solo aparece si hay favoritos) */}
       {displayFavorites.length > 0 && (
-        <Carousel title="Tus Animes Favoritos">
+        <Carousel title="Tus Favoritos">
           {displayFavorites.map(anime => (
             <AnimeCard 
               key={`fav-${anime.id}`}
               anime={anime}
               isFavorite={true}
               onToggleFavorite={handleToggleFavorite}
+            />
+          ))}
+        </Carousel>
+      )}
+
+      {/* Carrusel con Películas y Sagas */}
+      {trendingMovies && trendingMovies.length > 0 && (
+        <Carousel title="Películas y Sagas Recomendadas">
+          {trendingMovies
+            .filter(a => !(hiddenAnimes || []).some(h => String(h.id) === String(a.id)))
+            .slice(0, 10).map(anime => (
+            <AnimeCard 
+              key={`mov-${anime.id}`}
+              anime={anime}
+              isFavorite={(favoriteAnimes || []).some(a => String(typeof a === 'object' ? a.id : a) === String(anime.id))}
+              onToggleFavorite={handleToggleFavorite}
+              onHide={handleHide}
+            />
+          ))}
+        </Carousel>
+      )}
+
+      {/* Carrusel con Series Populares (The Walking Dead, Grotesquerie, Cazador de Demonios, etc.) */}
+      {trendingSeries && trendingSeries.length > 0 && (
+        <Carousel title="Series Populares">
+          {trendingSeries
+            .filter(a => !(hiddenAnimes || []).some(h => String(h.id) === String(a.id)))
+            .slice(0, 10).map(anime => (
+            <AnimeCard 
+              key={`ser-${anime.id}`}
+              anime={anime}
+              isFavorite={(favoriteAnimes || []).some(a => String(typeof a === 'object' ? a.id : a) === String(anime.id))}
+              onToggleFavorite={handleToggleFavorite}
+              onHide={handleHide}
             />
           ))}
         </Carousel>
@@ -276,9 +323,9 @@ const Home = () => {
         )}
       </Carousel>
 
-      {/* Animes Recomendados (De todos los animes existentes - Grid) */}
+      {/* Catálogo Global - Grid */}
       <section className={styles.allTimeSection}>
-        <h2 className={styles.gridTitle}>Animes Recomendados (Catálogo Global)</h2>
+        <h2 className={styles.gridTitle}>Catálogo Global Destacado</h2>
         {loading && (!allTimeAnime || allTimeAnime.length === 0) ? (
           <SkeletonGrid count={10} />
         ) : (
