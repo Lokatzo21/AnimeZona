@@ -169,7 +169,7 @@ const CUSTOM_MEDIA_ENRICHMENT = {
   },
   'piratas del caribe': {
     backdrop: 'https://image.tmdb.org/t/p/original/uRNgkJSkNBFbbn9fPsEjDIy8Sh3.jpg',
-    image: 'https://image.tmdb.org/t/p/w500/8zHnkTGyAImBcI49a1xFJHUjbaK.jpg'
+    image: 'https://m.media-amazon.com/images/I/81D2e1rqCyL.jpg'
   },
   'arma mortal': {
     backdrop: 'https://image.tmdb.org/t/p/original/yqZ5ACKeNJ30mylUEzvtWZu4pGU.jpg',
@@ -207,11 +207,14 @@ const mapCustomAnime = (item) => {
   const enrichment = CUSTOM_MEDIA_ENRICHMENT[titleKey] || 
     Object.entries(CUSTOM_MEDIA_ENRICHMENT).find(([k]) => titleKey.includes(k))?.[1] || {};
 
-  const posterImage = (item.image && item.image.includes('image.tmdb.org')) 
-    ? item.image 
+  // La imagen y banner guardados en la BD siempre tienen prioridad absoluta sobre los fallbacks
+  const posterImage = (item.image && typeof item.image === 'string' && item.image.trim().length > 0 && !item.image.includes('placeholder.com')) 
+    ? item.image.trim() 
     : (enrichment.image || item.image || 'https://via.placeholder.com/225x318?text=No+Image');
 
-  const backdropUrl = item.banner || enrichment.backdrop || null;
+  const backdropUrl = (item.banner && typeof item.banner === 'string' && item.banner.trim().length > 0)
+    ? item.banner.trim()
+    : (enrichment.backdrop || null);
   const hasBackdrop = Boolean(backdropUrl);
 
   return {
