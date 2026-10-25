@@ -576,6 +576,102 @@ async function syncSupabaseRecord(client, record, tmdbInfo = null) {
 }
 
 /**
+ * Función Interactiva para Renovar Enlaces Expirados o Caídos en Supabase
+ */
+async function renewSeriesInteractive(rl, client) {
+  if (!client) {
+    console.log('❌ No hay conexión activa a Supabase para renovar enlaces.');
+    return;
+  }
+  console.log('\n[🔄] Buscando series con enlaces de Mediafire en Supabase...');
+  try {
+    const res = await client.query(`
+      SELECT search_title, COUNT(*) as ep_count, MAX(anime_tmdb_id) as tmdb_id
+      FROM anime_episodes
+      WHERE video_url ILIKE '%mediafire%'
+      GROUP BY search_title
+      ORDER BY search_title ASC
+    `);
+
+    if (res.rows.length === 0) {
+      console.log('No se encontraron series con enlaces de Mediafire.');
+      return;
+    }
+
+    console.log('\nSeries registradas en Supabase:');
+    res.rows.forEach((row, idx) => {
+      console.log(`  [${idx + 1}] ${row.search_title} (${row.ep_count} episodios) [TMDB: ${row.tmdb_id || 'N/A'}]`);
+    });
+
+    const choice = await ask(rl, `\nSelecciona el número de la serie a renovar [1-${res.rows.length}]: `);
+    const idx = parseInt(choice, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= res.rows.length) {
+      console.log('Selección inválida.');
+      return;
+    }
+
+    const selected = res.rows[idx];
+    console.log(`\nSeleccionaste: "${selected.search_title}"`);
+    const soloUrl = await ask(rl, `Ingresa la URL principal de "${selected.search_title}" en SoloLatino (ej. https://sololatino.net/serie/...): `);
+    if (!soloUrl || !soloUrl.startsWith('http')) {
+      console.log('URL de SoloLatino no válida.');
+      return;
+    }
+
+    console.log(`\n[⏳] Obteniendo lista de episodios desde SoloLatino...`);
+    const seriesData = await fetchSeriesEpisodes(soloUrl);
+    if (!seriesData.episodes || seriesData.episodes.length === 0) {
+      console.log('❌ No se encontraron episodios en esa URL de SoloLatino.');
+      return;
+    }
+
+    console.log(`🚀 Renovando ${seriesData.episodes.length} episodios para "${selected.search_title}"...`);
+    for (let i = 0; i < seriesData.episodes.length; i++) {
+      const ep = seriesData.episodes[i];
+      const epNum = i + 1;
+      process.stdout.write(`[${epNum}/${seriesData.episodes.length}] T${ep.season}E${ep.episode}: `);
+      let tries = 0;
+      while (tries < 3) {
+        try {
+          const freshRes = await extractMediafireSingle(ep.url);
+          const sizeNum = parseFloat(freshRes.sizeMB) || 0;
+          let finalUrl = `${freshRes.resolverUrl}&.mp4`;
+          let finalServer = 'MEDIAFIRE';
+
+          // Para archivos mayores a 950MB, guardar directo
+          if (sizeNum > 950) {
+            finalUrl = freshRes.streamUrl;
+            finalServer = 'Mediafire Directo';
+          }
+
+          await client.query(
+            `UPDATE anime_episodes
+             SET video_url = $1, server_name = $2
+             WHERE LOWER(search_title) = LOWER($3) AND episode_number = $4 AND season_number = $5`,
+            [finalUrl, finalServer, selected.search_title, epNum, ep.season]
+          );
+          console.log(`✅ OK (${freshRes.sizeMB} MB) -> Servidor: ${finalServer}`);
+          break;
+        } catch (err) {
+          tries++;
+          if (err.message.includes('rate_limited') && tries < 3) {
+            process.stdout.write(`⏳ [Rate limit, esperando 10s (${tries}/3)]... `);
+            await sleep(10000);
+            continue;
+          }
+          console.log(`❌ Error: ${err.message}`);
+          break;
+        }
+      }
+      await sleep(3500); // 3.5s cooldown entre episodios
+    }
+    console.log(`\n🎉 ¡Renovación de "${selected.search_title}" completada con éxito!`);
+  } catch (err) {
+    console.log('❌ Error al renovar serie:', err.message);
+  }
+}
+
+/**
  * Bucle Principal Interactivo
  */
 async function main() {
@@ -603,11 +699,19 @@ async function main() {
   try {
     while (true) {
       console.log('\n----------------------------------------------------------------');
-      const inputUrl = await ask(rl, '👉 Pega el enlace de SoloLatino (Película, Serie, Anime o Episodio) [o "q" para salir]: ');
+      console.log('👉 Pega el enlace de SoloLatino (Película, Serie, Anime o Episodio)');
+      console.log('   Escribe "r" o "renovar" para actualizar enlaces caídos en Supabase');
+      console.log('   Escribe "q" para salir');
+      const inputUrl = await ask(rl, 'Opción o URL: ');
 
       if (!inputUrl || inputUrl.toLowerCase() === 'q' || inputUrl.toLowerCase() === 'salir') {
         console.log('\n👋 ¡Listo! Cerrando convertidor...');
         break;
+      }
+
+      if (inputUrl.toLowerCase() === 'r' || inputUrl.toLowerCase() === 'renovar') {
+        await renewSeriesInteractive(rl, dbClient);
+        continue;
       }
 
       try {
@@ -712,7 +816,13 @@ async function main() {
             console.log('  [1] Permanente Inteligente (Resolver Vercel - NUNCA CADUCA) [Recomendado]');
             console.log('  [2] Directo Temporal (downloadXXXX...?.mp4 - Caduca en 12-24 horas)');
             const linkTypeChoice = (await ask(rl, 'Opción [1-2, Enter = 1]: ')) || '1';
-            const chosenUrl = linkTypeChoice === '2' ? res.streamUrl : `${res.resolverUrl}&.mp4`;
+            const sizeNum = parseFloat(res.sizeMB) || 0;
+            let chosenUrl = `${res.resolverUrl}&.mp4`;
+            let chosenServer = 'MEDIAFIRE';
+            if (linkTypeChoice === '2' || sizeNum > 950) {
+              chosenUrl = res.streamUrl;
+              chosenServer = 'Mediafire Directo';
+            }
 
             const doInsert = (await ask(rl, '\n¿Deseas insertar/actualizar este registro en Supabase? (S/N, Enter = S): ')).toLowerCase();
             if (doInsert !== 'n' && doInsert !== 'no') {
@@ -726,7 +836,7 @@ async function main() {
                 episode_number: epNum,
                 season_number: seasonNum,
                 episode_name: singleEpName,
-                server_name: 'MEDIAFIRE',
+                server_name: chosenServer,
                 language: lang,
                 video_url: chosenUrl,
                 anime_tmdb_id: tmdbId
@@ -897,14 +1007,26 @@ async function main() {
             // Obtener el título real y oficial del episodio desde TMDB en español
             const officialEpName = await getTmdbEpisodeTitle(tmdbId, ep.season, ep.episode, `${sTitle} T${ep.season}E${ep.episode}`);
 
+            // Selección inteligente de enlace según tamaño de archivo:
+            // - Archivos <= 950 MB: Enlace Inmortal Vercel (Mediafire responde 200, enlace 100% permanente y sin vencimiento)
+            // - Archivos > 950 MB: Enlace Directo CDN Mediafire (Mediafire bloquea datacenters con Cloudflare en archivos de más de 1GB)
+            const sizeNum = parseFloat(res.sizeMB) || 0;
+            let finalVideoUrl = `${res.resolverUrl}&.mp4`;
+            let finalServerName = 'MEDIAFIRE';
+
+            if (linkTypeChoice === '2' || sizeNum > 950) {
+              finalVideoUrl = res.streamUrl;
+              finalServerName = 'Mediafire Directo';
+            }
+
             const itemRecord = {
               search_title: sTitle,
               episode_number: continuousNumber,
               season_number: ep.season,
               episode_name: officialEpName,
-              server_name: 'MEDIAFIRE',
+              server_name: finalServerName,
               language: lang,
-              video_url: (linkTypeChoice === '2' ? res.streamUrl : `${res.resolverUrl}&.mp4`),
+              video_url: finalVideoUrl,
               permanentLink: res.permanentLink,
               resolverUrl: res.resolverUrl,
               anime_tmdb_id: tmdbId,

@@ -54,6 +54,13 @@ function fbExtractorPlugin() {
 export default defineConfig({
   plugins: [react(), fbExtractorPlugin()],
   server: {
+    proxy: {
+      '/api': {
+        target: 'https://animezona.vercel.app',
+        changeOrigin: true,
+        secure: false
+      }
+    },
     watch: {
       ignored: ['**/scraper/**']
     }

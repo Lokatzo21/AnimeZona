@@ -283,13 +283,19 @@ const Watch = () => {
         .finally(() => setFbLoading(false));
     }
 
-    // Auto-resolver Mediafire: Obtiene enlace fresco en tiempo real con 0 segundos de antigüedad
+    // Auto-resolver Mediafire: Obtiene enlace fresco en tiempo real
+    const isMfDirectCdn = activeServer?.url && /https?:\/\/download\d+\.mediafire\.com/i.test(activeServer.url);
     const isMf = activeServer && activeServer.url && (
       activeServer.server_name === 'MEDIAFIRE' ||
+      activeServer.server_name === 'MEDIAFIRE DIRECTO' ||
       activeServer.url.includes('mediafire.com') ||
       activeServer.url.includes('/api/mediafire')
     );
-    if (isMf) {
+
+    if (isMfDirectCdn) {
+      setResolvedMfUrl(activeServer.url);
+      setMfLoading(false);
+    } else if (isMf) {
       setMfLoading(true);
       const apiUrl = activeServer.url.includes('/api/mediafire')
         ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
@@ -912,20 +918,24 @@ const Watch = () => {
                           onWaiting={handleVideoWaiting}
                           onPlaying={() => { setPlaybackError(false); handleVideoPlaying(); }}
                           onError={(e) => {
-                            console.warn("Mediafire stream load error, intentando refrescar token:", e);
-                            const apiUrl = activeServer.url.includes('/api/mediafire')
-                              ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
-                              : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
-                            fetch(apiUrl)
-                              .then(r => r.json())
-                              .then(d => {
-                                if (d.success && d.stream_url && d.stream_url !== resolvedMfUrl) {
-                                  setResolvedMfUrl(d.stream_url);
-                                } else {
-                                  setPlaybackError(true);
-                                }
-                              })
-                              .catch(() => setPlaybackError(true));
+                            console.warn("Mediafire stream load error, verificando si se puede refrescar:", e);
+                            if (activeServer.url.includes('/api/mediafire') || activeServer.url.includes('mediafire.com/file/')) {
+                              const apiUrl = activeServer.url.includes('/api/mediafire')
+                                ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
+                                : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
+                              fetch(apiUrl)
+                                .then(r => r.json())
+                                .then(d => {
+                                  if (d.success && d.stream_url && d.stream_url !== resolvedMfUrl) {
+                                    setResolvedMfUrl(d.stream_url);
+                                  } else {
+                                    setPlaybackError(true);
+                                  }
+                                })
+                                .catch(() => setPlaybackError(true));
+                            } else {
+                              setPlaybackError(true);
+                            }
                           }}
                           onDoubleClick={handleDoubleClick}
                           onClick={() => { if(!controlsVisible) { nativeVideoRef.current?.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
