@@ -171,6 +171,10 @@ const Watch = () => {
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [qualityChangeTime, setQualityChangeTime] = useState(null);
 
+  // Mediafire states
+  const [resolvedMfUrl, setResolvedMfUrl] = useState(null);
+  const [mfLoading, setMfLoading] = useState(false);
+
   useEffect(() => {
     if (user) {
       api.isAdmin(user.email).then(setIsAdmin);
@@ -259,6 +263,8 @@ const Watch = () => {
     setFbQualities(null);
     setCurrentFbQuality('');
     setShowQualityMenu(false);
+    setResolvedMfUrl(null);
+
     if (activeServer && activeServer.url && (activeServer.url.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) {
       setFbLoading(true);
       fetch(`/api/extract-fb?url=${encodeURIComponent(activeServer.url)}`)
@@ -275,6 +281,31 @@ const Watch = () => {
           }
         })
         .finally(() => setFbLoading(false));
+    }
+
+    // Auto-resolver Mediafire: Obtiene enlace fresco en tiempo real con 0 segundos de antigüedad
+    const isMf = activeServer && activeServer.url && (
+      activeServer.server_name === 'MEDIAFIRE' ||
+      activeServer.url.includes('mediafire.com') ||
+      activeServer.url.includes('/api/mediafire')
+    );
+    if (isMf) {
+      setMfLoading(true);
+      const apiUrl = activeServer.url.includes('/api/mediafire')
+        ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
+        : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
+
+      fetch(apiUrl)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.stream_url) {
+            setResolvedMfUrl(data.stream_url);
+          } else {
+            setResolvedMfUrl(activeServer.url);
+          }
+        })
+        .catch(() => setResolvedMfUrl(activeServer.url))
+        .finally(() => setMfLoading(false));
     }
   }, [activeServer]);
 
@@ -859,6 +890,117 @@ const Watch = () => {
                     ) : (
                       <div className={styles.loadingServer}>Hubo un error extrayendo el video de Facebook. URL recibida: {activeServer.url}</div>
                     )
+                  ) : (activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire.com') || activeServer?.url?.includes('/api/mediafire')) ? (
+                    mfLoading ? (
+                      <div className={styles.loadingServer}>Conectando con Mediafire... (Generando stream fresco)</div>
+                    ) : (
+                      <>
+                        <video 
+                          ref={nativeVideoRef}
+                          key={resolvedMfUrl || activeServer.url}
+                          src={resolvedMfUrl || activeServer.url} 
+                          controls={controlsVisible}
+                          playsInline
+                          webkit-playsinline="true"
+                          x-webkit-airplay="allow"
+                          preload="metadata"
+                          poster={animeInfo?.image || ''}
+                          className={styles.iframe}
+                          onLoadedMetadata={handleVideoLoaded}
+                          onTimeUpdate={handleTimeUpdate}
+                          onPause={handleTimeUpdate}
+                          onWaiting={handleVideoWaiting}
+                          onPlaying={() => { setPlaybackError(false); handleVideoPlaying(); }}
+                          onError={(e) => {
+                            console.warn("Mediafire stream load error, intentando refrescar token:", e);
+                            const apiUrl = activeServer.url.includes('/api/mediafire')
+                              ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
+                              : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
+                            fetch(apiUrl)
+                              .then(r => r.json())
+                              .then(d => {
+                                if (d.success && d.stream_url && d.stream_url !== resolvedMfUrl) {
+                                  setResolvedMfUrl(d.stream_url);
+                                } else {
+                                  setPlaybackError(true);
+                                }
+                              })
+                              .catch(() => setPlaybackError(true));
+                          }}
+                          onDoubleClick={handleDoubleClick}
+                          onClick={() => { if(!controlsVisible) { nativeVideoRef.current?.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
+                        ></video>
+                        {playbackError && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.85)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10,
+                            color: '#fff',
+                            padding: '20px',
+                            textAlign: 'center'
+                          }}>
+                            <p style={{fontSize: '1.2rem', marginBottom: '15px'}}>No se pudo cargar el stream de Mediafire.</p>
+                            <button 
+                              onClick={() => {
+                                setPlaybackError(false);
+                                setMfLoading(true);
+                                const apiUrl = activeServer.url.includes('/api/mediafire')
+                                  ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
+                                  : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
+                                fetch(apiUrl)
+                                  .then(r => r.json())
+                                  .then(d => {
+                                    if (d.success && d.stream_url) setResolvedMfUrl(d.stream_url);
+                                  })
+                                  .finally(() => setMfLoading(false));
+                              }}
+                              style={{
+                                background: '#ff3d00',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '10px 24px',
+                                borderRadius: '8px',
+                                fontSize: '1rem',
+                                fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Reintentar Reproducción
+                            </button>
+                          </div>
+                        )}
+                        {showSkipIntro && (
+                          <button onClick={skipIntro} className={styles.skipIntroBtn}>
+                            <SkipForward size={20} /> Saltar Intro
+                          </button>
+                        )}
+                        {showNextEpisode && nextEpisode && (
+                          <button onClick={() => navigate(`/watch/${id}/${nextEpisode?.id}`)} className={styles.nextEpBtn}>
+                            <FastForward size={20} /> Siguiente Episodio
+                          </button>
+                        )}
+                        {showResumePrompt && (
+                          <div className={styles.resumeOverlay}>
+                            <div className={styles.resumeBox}>
+                              <h3>Continuar Viendo</h3>
+                              <p>Te quedaste en el minuto {Math.floor(savedTime / 60)}:{(Math.floor(savedTime % 60)).toString().padStart(2, '0')}</p>
+                              <div className={styles.resumeActions}>
+                                <button onClick={handleResume} className={styles.resumeBtn}>Continuar</button>
+                                <button onClick={handleStartOver} className={styles.startOverBtn}>Empezar de cero</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )
                   ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8')) ? (
                     <>
                       <video 
@@ -983,7 +1125,7 @@ const Watch = () => {
                 <span>{cinemaMode ? 'Encender luz' : 'Apagar luz'}</span>
               </button>
               
-              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
+              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
                 <>
                   <button onClick={handleDoubleClick} className={styles.toolbarBtn} title="Pantalla Completa">
                     <Maximize size={18} />
@@ -1017,7 +1159,7 @@ const Watch = () => {
                 </>
               )}
 
-              {isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+              {isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
                 <button 
                   onClick={() => setShowAdminPanel(!showAdminPanel)} 
                   className={styles.toolbarBtn} 
@@ -1028,7 +1170,7 @@ const Watch = () => {
               )}
             </div>
 
-            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
               <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-dark-secondary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid #ef4444' }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#f8fafc', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>⚙️</span> Panel de Control Admin - Tiempos

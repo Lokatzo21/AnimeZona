@@ -709,10 +709,10 @@ async function main() {
           // Insertar en Supabase
           if (dbClient) {
             console.log('\nTipo de enlace a guardar en Supabase:');
-            console.log('  [1] Directo de Mediafire (downloadXXXX...?.mp4) [Recomendado - 100% Compatible]');
-            console.log('  [2] Vercel Resolver (Puede fallar con 403 en archivos > 1GB por Cloudflare)');
+            console.log('  [1] Permanente Inteligente (Resolver Vercel - NUNCA CADUCA) [Recomendado]');
+            console.log('  [2] Directo Temporal (downloadXXXX...?.mp4 - Caduca en 12-24 horas)');
             const linkTypeChoice = (await ask(rl, 'Opción [1-2, Enter = 1]: ')) || '1';
-            const chosenUrl = linkTypeChoice === '2' ? res.resolverUrl : res.streamUrl;
+            const chosenUrl = linkTypeChoice === '2' ? res.streamUrl : `${res.resolverUrl}&.mp4`;
 
             const doInsert = (await ask(rl, '\n¿Deseas insertar/actualizar este registro en Supabase? (S/N, Enter = S): ')).toLowerCase();
             if (doInsert !== 'n' && doInsert !== 'no') {
@@ -794,8 +794,8 @@ async function main() {
             autoInsertSupabase = (askDb !== 'n' && askDb !== 'no');
             if (autoInsertSupabase) {
               console.log('\nTipo de enlace a guardar en Supabase:');
-              console.log('  [1] Directo de Mediafire (downloadXXXX...?.mp4) [Recomendado - 100% Compatible]');
-              console.log('  [2] Vercel Resolver (Puede fallar con 403 en archivos > 1GB por Cloudflare)');
+              console.log('  [1] Permanente Inteligente (Resolver Vercel - NUNCA CADUCA) [Recomendado]');
+              console.log('  [2] Directo Temporal (downloadXXXX...?.mp4 - Caduca en 12-24 horas)');
               linkTypeChoice = (await ask(rl, 'Opción [1-2, Enter = 1]: ')) || '1';
             }
           }
@@ -904,7 +904,7 @@ async function main() {
               episode_name: officialEpName,
               server_name: 'MEDIAFIRE',
               language: lang,
-              video_url: (linkTypeChoice === '2' ? res.resolverUrl : res.streamUrl),
+              video_url: (linkTypeChoice === '2' ? res.streamUrl : `${res.resolverUrl}&.mp4`),
               permanentLink: res.permanentLink,
               resolverUrl: res.resolverUrl,
               anime_tmdb_id: tmdbId,

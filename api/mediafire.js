@@ -29,6 +29,13 @@ export default async function handler(req, res) {
     });
   }
 
+  // Normalizar: limpiar sufijos de formato y convertir enlaces directos a página permanente
+  targetPage = targetPage.replace(/[?&]\.mp4$/i, '').trim();
+  const mfDirect = targetPage.match(/mediafire\.com\/[^\/]+\/([a-zA-Z0-9]+)\/([^\/?#]+)/);
+  if (mfDirect && !targetPage.includes('/file/')) {
+    targetPage = `https://www.mediafire.com/file/${mfDirect[1]}/${mfDirect[2]}/file`;
+  }
+
   try {
     const response = await fetch(targetPage, {
       headers: {
