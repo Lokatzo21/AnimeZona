@@ -241,12 +241,23 @@ async function extractMediafireSingle(targetUrl) {
     });
   }
 
-  // Click & scan
+  // Click & scan con manejo inteligente de rate_limited
   await callS({ a: 'click', tok: tok, ts: '1' });
-  const scan = await callS({ a: '1', tok: tok });
+  let scan = await callS({ a: '1', tok: tok });
+
+  if (scan && scan.msg === 'rate_limited') {
+    process.stdout.write('⏳ [Rate limit detectado, esperando 8s]... ');
+    await sleep(8000);
+    scan = await callS({ a: '1', tok: tok });
+    if (scan && scan.msg === 'rate_limited') {
+      process.stdout.write('⏳ [esperando 10s más]... ');
+      await sleep(10000);
+      scan = await callS({ a: '1', tok: tok });
+    }
+  }
 
   if (!scan || !scan.s || !Array.isArray(scan.s)) {
-    throw new Error('No se recibió la lista de servidores del reproductor');
+    throw new Error('Respuesta no válida del reproductor: ' + JSON.stringify(scan));
   }
 
   const playerPlus = scan.s.find(item => item[0].includes('Player+') || item[0].includes('Principal'));
@@ -256,8 +267,14 @@ async function extractMediafireSingle(targetUrl) {
 
   const serverHash = playerPlus[1];
 
-  // Stream endpoint
-  const resA2 = await callS({ a: '2', v: serverHash, tok: tok });
+  // Stream endpoint con reintento si hay rate_limited
+  let resA2 = await callS({ a: '2', v: serverHash, tok: tok });
+  if (resA2 && resA2.msg === 'rate_limited') {
+    process.stdout.write('⏳ [esperando 8s]... ');
+    await sleep(8000);
+    resA2 = await callS({ a: '2', v: serverHash, tok: tok });
+  }
+
   if (!resA2 || !resA2.u) {
     throw new Error(`Respuesta no válida del reproductor: ${JSON.stringify(resA2)}`);
   }
@@ -700,6 +717,27 @@ async function main() {
             const ep = selectedEpisodes[i];
             const continuousNumber = currentContinuousEp + i;
             const progress = `[${i + 1}/${selectedEpisodes.length}] T${ep.season} E${ep.episode} (Ep. continuo ${continuousNumber})`;
+
+            // Verificar si ya existe previamente en Supabase con MEDIAFIRE
+            if (autoInsertSupabase && dbClient) {
+              try {
+                const existingCheck = await dbClient.query(
+                  `SELECT id FROM anime_episodes 
+                   WHERE LOWER(search_title) = LOWER($1) 
+                     AND episode_number = $2 
+                     AND season_number = $3 
+                     AND UPPER(server_name) = 'MEDIAFIRE' 
+                   LIMIT 1`,
+                  [sTitle, continuousNumber, ep.season]
+                );
+                if (existingCheck.rows.length > 0) {
+                  process.stdout.write(`${progress}: ⏭️  Ya existe en Supabase (Omitiendo)\n`);
+                  successCount++;
+                  continue;
+                }
+              } catch (e) {}
+            }
+
             process.stdout.write(`${progress}: Extrayendo... `);
 
             try {
@@ -739,8 +777,8 @@ async function main() {
               process.stdout.write(`❌ Error: ${err.message}\n`);
             }
 
-            // Pausa educada entre episodios
-            await sleep(650);
+            // Pausa educada entre episodios para no activar rate-limit de SoloLatino
+            await sleep(2200);
           }
 
           // Guardar en archivo maestro permanente
