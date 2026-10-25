@@ -7125,29 +7125,37 @@ export const api = {
       const cleanTitle = (animeTitle || '').trim().toLowerCase();
       const strId = String(animeId || '').trim();
 
-      // Buscar si este anime tiene filas en anime_episodes
-      let { data: collEps } = await supabase
-        .from('anime_episodes')
-        .select('anime_tmdb_id, search_title, episode_name, episode_number, season_number')
-        .or(`search_title.ilike.%${cleanTitle}%,anime_tmdb_id.eq.${strId}`)
-        .order('episode_number', { ascending: true });
-
-      // Si no encuentra por búsqueda directa, verificar si strId es un anime_tmdb_id de una película dentro de una saga
-      if (!collEps || collEps.length === 0) {
-        const { data: movieRow } = await supabase
+      // 1. Buscar si esta película específica está vinculada a una saga por su anime_tmdb_id
+      let collEps = [];
+      if (strId) {
+        const { data: movieRows } = await supabase
           .from('anime_episodes')
-          .select('search_title, episode_name, episode_number')
+          .select('search_title')
           .eq('anime_tmdb_id', strId)
           .limit(1);
 
-        if (movieRow && movieRow.length > 0) {
-          const parentTitle = movieRow[0].search_title;
+        if (movieRows && movieRows.length > 0) {
+          const parentTitle = movieRows[0].search_title;
           const { data: parentEps } = await supabase
             .from('anime_episodes')
             .select('anime_tmdb_id, search_title, episode_name, episode_number, season_number')
             .ilike('search_title', parentTitle)
             .order('episode_number', { ascending: true });
-          collEps = parentEps;
+          if (parentEps && parentEps.length > 0) {
+            collEps = parentEps;
+          }
+        }
+      }
+
+      // 2. Si no se encontró por ID de película, verificar si la página actual es la colección por nombre EXACTO
+      if (collEps.length === 0 && cleanTitle) {
+        const { data: exactTitleEps } = await supabase
+          .from('anime_episodes')
+          .select('anime_tmdb_id, search_title, episode_name, episode_number, season_number')
+          .ilike('search_title', cleanTitle)
+          .order('episode_number', { ascending: true });
+        if (exactTitleEps && exactTitleEps.length > 0) {
+          collEps = exactTitleEps;
         }
       }
 
@@ -7161,7 +7169,7 @@ export const api = {
       // Si tiene múltiples temporadas y NO se llama explícitamente "Colección/Saga", es una serie normal, NO una saga
       if (hasMultipleSeasons && !isExplicitCollection) return null;
 
-      const distinctTmdbIds = new Set(collEps.map(e => e.anime_tmdb_id).filter(Boolean));
+      const distinctTmdbIds = new Set(collEps.map(e => String(e.anime_tmdb_id || '').trim()).filter(Boolean));
       // Si no es un nombre de colección explícito y no tiene diferentes IDs de películas vinculadas, tampoco es una saga
       if (!isExplicitCollection && distinctTmdbIds.size <= 1) return null;
 
@@ -7174,7 +7182,7 @@ export const api = {
           uniqueMoviesMap.set(ep.episode_number, {
             episode_number: ep.episode_number,
             title: ep.episode_name || `Película ${ep.episode_number}`,
-            tmdb_id: ep.anime_tmdb_id,
+            tmdb_id: String(ep.anime_tmdb_id || '').trim(),
             season: ep.season_number || 1
           });
         }
@@ -7182,6 +7190,15 @@ export const api = {
 
       const moviesList = Array.from(uniqueMoviesMap.values()).sort((a, b) => a.episode_number - b.episode_number);
       if (moviesList.length <= 1) return null;
+
+      // VALIDACIÓN CLAVE:
+      // Si no es la colección padre por nombre exacto, el ID de esta película DEBE pertenecer a las películas de la saga
+      const isParentCollection = cleanTitle === sagaTitle.toLowerCase();
+      const movieBelongsToSaga = strId && moviesList.some(m => m.tmdb_id === strId);
+
+      if (!isParentCollection && !movieBelongsToSaga) {
+        return null; // Esta película NO pertenece a la saga
+      }
 
       // Buscar item de la Colección en custom_animes si existe
       const { data: customColl } = await supabase

@@ -357,7 +357,7 @@ const AnimeDetails = () => {
           <div className={styles.sagaMoviesRow}>
             {sagaInfo.movies.map((m) => {
               const isCurrent = String(m.tmdb_id) === String(animeInfo.id) ||
-                (m.title && animeInfo.title && m.title.toLowerCase().includes(animeInfo.title.toLowerCase()));
+                (m.title && animeInfo.title && m.title.toLowerCase().trim() === animeInfo.title.toLowerCase().trim());
 
               return (
                 <Link
