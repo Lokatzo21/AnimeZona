@@ -316,7 +316,7 @@ async function extractMediafireSingle(targetUrl) {
     headers: { 'Referer': playerUrl }
   });
 
-  const mediafireDirect = resRedirect.headers['location'];
+  let mediafireDirect = resRedirect.headers['location'];
   if (!mediafireDirect) {
     throw new Error('No se recibió la redirección hacia Mediafire');
   }
@@ -805,17 +805,45 @@ async function main() {
             try {
               let res = await extractMediafireSingle(ep.url);
 
-              // Si dio 0.00 MB, reintentar renovación automática
-              if (res.sizeMB === '0.00') {
-                process.stdout.write('⚠️ [0.00 MB, reintentando renovación]... ');
-                await sleep(4000);
+              // Si dio 0.00 MB, reintentar renovación automática directa de Mediafire
+              if (res.sizeMB === '0.00' && res.permanentLink) {
+                process.stdout.write('⚠️ [0.00 MB, renovando directo de Mediafire]... ');
                 try {
-                  const retryRes = await extractMediafireSingle(ep.url);
-                  if (retryRes.sizeMB !== '0.00') res = retryRes;
+                  const pageRes = await httpsRequest(res.permanentLink);
+                  if (pageRes.statusCode === 200) {
+                    const directMatch = pageRes.data.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
+                    if (directMatch) {
+                      res.directLink = directMatch[0];
+                      res.streamUrl = directMatch[0] + '?.mp4';
+                      const u2 = new URL(res.directLink);
+                      const head2 = await new Promise((resolve) => {
+                        const req = https.request({
+                          hostname: u2.hostname,
+                          path: u2.pathname,
+                          method: 'HEAD',
+                          headers: { 'User-Agent': getRandomUserAgent() },
+                          timeout: 8000
+                        }, (r) => resolve({ status: r.statusCode, contentLength: r.headers['content-length'] }));
+                        req.on('timeout', () => { req.destroy(); resolve({ status: 408 }); });
+                        req.on('error', () => resolve({ status: 500 }));
+                        req.end();
+                      });
+                      if (head2.status === 200 || head2.status === 206) {
+                        res.alive = true;
+                        if (head2.contentLength) {
+                          res.sizeMB = (parseInt(head2.contentLength, 10) / (1024 * 1024)).toFixed(2);
+                        }
+                      }
+                    }
+                  }
                 } catch (eRetry) {}
               }
 
-              process.stdout.write(`✅ OK (${res.sizeMB} MB)`);
+              if (res.sizeMB === '0.00') {
+                process.stdout.write(`⚠️ ALERTA (${res.sizeMB} MB - Enlace aún no activo)`);
+              } else {
+                process.stdout.write(`✅ OK (${res.sizeMB} MB)`);
+              }
 
               const itemRecord = {
                 search_title: sTitle,
@@ -850,13 +878,13 @@ async function main() {
               process.stdout.write(`❌ Error: ${err.message}\n`);
             }
 
-            // Pausa educada entre episodios
-            await sleep(2800);
+            // Pausa educada entre episodios (3.5 segundos evita el rate limit de SoloLatino)
+            await sleep(3500);
 
-            // Cada 6 episodios procesados seguidos, pausa preventiva de 12s para no saturar SoloLatino
+            // Cada 6 episodios procesados seguidos, pausa preventiva de 10s para no saturar SoloLatino
             if ((successCount % 6 === 0) && (i + 1 < selectedEpisodes.length)) {
-              console.log('   ☕ [Pausa preventiva de 12s para evitar bloqueos del servidor]...');
-              await sleep(12000);
+              console.log('   ☕ [Pausa preventiva de 10s para enfriar el servidor]...');
+              await sleep(10000);
             }
           }
 
