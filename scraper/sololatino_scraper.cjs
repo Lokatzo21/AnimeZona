@@ -527,9 +527,13 @@ async function main() {
         let defaultTitle = tmdbData ? (tmdbData.title || tmdbData.name) : (detectedTitle.charAt(0).toUpperCase() + detectedTitle.slice(1));
 
         if (tmdbData) {
-          console.log(`✨ TMDB encontrado: "${defaultTitle}" (ID: ${defaultTmdbId}) | Estreno: ${tmdbData.release_date || tmdbData.first_air_date || 'N/A'}`);
+          console.log(`🎬 TMDB Detectado : "${defaultTitle}" (ID: ${defaultTmdbId})`);
+          console.log(`📅 Año Estreno    : ${tmdbData.release_date || tmdbData.first_air_date || 'N/A'}`);
+          if (tmdbData.poster_path) {
+            console.log(`🖼️  Póster Oficial: https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`);
+          }
         } else {
-          console.log(`⚠️ No se encontró en TMDB automáticamente.`);
+          console.log(`⚠️  No se encontró en TMDB automáticamente.`);
         }
 
         console.log('\n----------------------------------------------------------------');
