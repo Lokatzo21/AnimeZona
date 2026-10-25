@@ -273,19 +273,15 @@ async function extractMediafireSingle(targetUrl) {
     });
   }
 
-  // Click & scan con manejo inteligente y cooldown real de rate_limited
+  // Click & scan con micro-espera humana y cooldown real de rate_limited
   await callS({ a: 'click', tok: tok, ts: '1' });
+  await sleep(650);
   let scan = await callS({ a: '1', tok: tok });
 
   if (scan && scan.msg === 'rate_limited') {
-    process.stdout.write('⏳ [Rate limit: enfriando servidor 18s]... ');
-    await sleep(18000);
+    process.stdout.write('⏳ [Servidor saturado: enfriando IP 35s]... ');
+    await sleep(35000);
     scan = await callS({ a: '1', tok: tok });
-    if (scan && scan.msg === 'rate_limited') {
-      process.stdout.write('⏳ [esperando 25s más]... ');
-      await sleep(25000);
-      scan = await callS({ a: '1', tok: tok });
-    }
   }
 
   if (!scan || !scan.s || !Array.isArray(scan.s)) {
@@ -299,11 +295,12 @@ async function extractMediafireSingle(targetUrl) {
 
   const serverHash = playerPlus[1];
 
-  // Stream endpoint con reintento si hay rate_limited
+  // Stream endpoint con micro-espera y reintento si hay rate_limited
+  await sleep(650);
   let resA2 = await callS({ a: '2', v: serverHash, tok: tok });
   if (resA2 && resA2.msg === 'rate_limited') {
-    process.stdout.write('⏳ [enfriando servidor 18s]... ');
-    await sleep(18000);
+    process.stdout.write('⏳ [Servidor saturado: enfriando IP 35s]... ');
+    await sleep(35000);
     resA2 = await callS({ a: '2', v: serverHash, tok: tok });
   }
 
@@ -802,80 +799,96 @@ async function main() {
 
             process.stdout.write(`${progress}: Extrayendo... `);
 
-            try {
-              let res = await extractMediafireSingle(ep.url);
+            let res = null;
+            let attempts = 0;
+            while (attempts < 3) {
+              try {
+                res = await extractMediafireSingle(ep.url);
+                break;
+              } catch (err) {
+                attempts++;
+                if (err.message.includes('rate_limited') || (err.data && String(err.data).includes('rate_limited'))) {
+                  if (attempts < 3) {
+                    process.stdout.write(`⏳ [Rate limit: esperando 35s para enfriar servidor (${attempts}/3)]... `);
+                    await sleep(35000);
+                    continue;
+                  }
+                }
+                process.stdout.write(`❌ Error: ${err.message}\n`);
+                break;
+              }
+            }
 
-              // Si dio 0.00 MB, reintentar renovación automática directa de Mediafire
-              if (res.sizeMB === '0.00' && res.permanentLink) {
-                process.stdout.write('⚠️ [0.00 MB, renovando directo de Mediafire]... ');
-                try {
-                  const pageRes = await httpsRequest(res.permanentLink);
-                  if (pageRes.statusCode === 200) {
-                    const directMatch = pageRes.data.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
-                    if (directMatch) {
-                      res.directLink = directMatch[0];
-                      res.streamUrl = directMatch[0] + '?.mp4';
-                      const u2 = new URL(res.directLink);
-                      const head2 = await new Promise((resolve) => {
-                        const req = https.request({
-                          hostname: u2.hostname,
-                          path: u2.pathname,
-                          method: 'HEAD',
-                          headers: { 'User-Agent': getRandomUserAgent() },
-                          timeout: 8000
-                        }, (r) => resolve({ status: r.statusCode, contentLength: r.headers['content-length'] }));
-                        req.on('timeout', () => { req.destroy(); resolve({ status: 408 }); });
-                        req.on('error', () => resolve({ status: 500 }));
-                        req.end();
-                      });
-                      if (head2.status === 200 || head2.status === 206) {
-                        res.alive = true;
-                        if (head2.contentLength) {
-                          res.sizeMB = (parseInt(head2.contentLength, 10) / (1024 * 1024)).toFixed(2);
-                        }
+            if (!res) continue;
+
+            // Si dio 0.00 MB, reintentar renovación automática directa de Mediafire
+            if (res.sizeMB === '0.00' && res.permanentLink) {
+              process.stdout.write('⚠️ [0.00 MB, renovando directo de Mediafire]... ');
+              try {
+                const pageRes = await httpsRequest(res.permanentLink);
+                if (pageRes.statusCode === 200) {
+                  const directMatch = pageRes.data.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
+                  if (directMatch) {
+                    res.directLink = directMatch[0];
+                    res.streamUrl = directMatch[0] + '?.mp4';
+                    const u2 = new URL(res.directLink);
+                    const head2 = await new Promise((resolve) => {
+                      const req = https.request({
+                        hostname: u2.hostname,
+                        path: u2.pathname,
+                        method: 'HEAD',
+                        headers: { 'User-Agent': getRandomUserAgent() },
+                        timeout: 8000
+                      }, (r) => resolve({ status: r.statusCode, contentLength: r.headers['content-length'] }));
+                      req.on('timeout', () => { req.destroy(); resolve({ status: 408 }); });
+                      req.on('error', () => resolve({ status: 500 }));
+                      req.end();
+                    });
+                    if (head2.status === 200 || head2.status === 206) {
+                      res.alive = true;
+                      if (head2.contentLength) {
+                        res.sizeMB = (parseInt(head2.contentLength, 10) / (1024 * 1024)).toFixed(2);
                       }
                     }
                   }
-                } catch (eRetry) {}
-              }
-
-              if (res.sizeMB === '0.00') {
-                process.stdout.write(`⚠️ ALERTA (${res.sizeMB} MB - Enlace aún no activo)`);
-              } else {
-                process.stdout.write(`✅ OK (${res.sizeMB} MB)`);
-              }
-
-              const itemRecord = {
-                search_title: sTitle,
-                episode_number: continuousNumber,
-                season_number: ep.season,
-                episode_name: `${sTitle} T${ep.season}E${ep.episode}`,
-                server_name: 'MEDIAFIRE',
-                language: lang,
-                video_url: (linkTypeChoice === '2' ? res.resolverUrl : res.streamUrl),
-                permanentLink: res.permanentLink,
-                resolverUrl: res.resolverUrl,
-                anime_tmdb_id: tmdbId,
-                sizeMB: res.sizeMB,
-                alive: res.alive,
-                total_episodes: totalEps
-              };
-
-              extractedList.push(itemRecord);
-              successCount++;
-
-              if (autoInsertSupabase && dbClient) {
-                try {
-                  const dbResult = await syncSupabaseRecord(dbClient, itemRecord, tmdbData);
-                  process.stdout.write(` | DB: ${dbResult.action}\n`);
-                } catch (dbErr) {
-                  process.stdout.write(` | DB Error: ${dbErr.message}\n`);
                 }
-              } else {
-                process.stdout.write('\n');
+              } catch (eRetry) {}
+            }
+
+            if (res.sizeMB === '0.00') {
+              process.stdout.write(`⚠️ ALERTA (${res.sizeMB} MB - Enlace aún no activo)`);
+            } else {
+              process.stdout.write(`✅ OK (${res.sizeMB} MB)`);
+            }
+
+            const itemRecord = {
+              search_title: sTitle,
+              episode_number: continuousNumber,
+              season_number: ep.season,
+              episode_name: `${sTitle} T${ep.season}E${ep.episode}`,
+              server_name: 'MEDIAFIRE',
+              language: lang,
+              video_url: (linkTypeChoice === '2' ? res.resolverUrl : res.streamUrl),
+              permanentLink: res.permanentLink,
+              resolverUrl: res.resolverUrl,
+              anime_tmdb_id: tmdbId,
+              sizeMB: res.sizeMB,
+              alive: res.alive,
+              total_episodes: totalEps
+            };
+
+            extractedList.push(itemRecord);
+            successCount++;
+
+            if (autoInsertSupabase && dbClient) {
+              try {
+                const dbResult = await syncSupabaseRecord(dbClient, itemRecord, tmdbData);
+                process.stdout.write(` | DB: ${dbResult.action}\n`);
+              } catch (dbErr) {
+                process.stdout.write(` | DB Error: ${dbErr.message}\n`);
               }
-            } catch (err) {
-              process.stdout.write(`❌ Error: ${err.message}\n`);
+            } else {
+              process.stdout.write('\n');
             }
 
             // Pausa educada entre episodios (3.5 segundos evita el rate limit de SoloLatino)
