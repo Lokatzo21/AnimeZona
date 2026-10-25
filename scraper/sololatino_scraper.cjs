@@ -202,8 +202,26 @@ async function extractMediafireSingle(targetUrl) {
     }
   }, JSON.stringify({ t: playerToken }));
 
-  const playerJson = JSON.parse(resApi.data);
-  const playerUrl = playerJson.url;
+  let playerJson = {};
+  try { playerJson = JSON.parse(resApi.data); } catch (e) {}
+  let playerUrl = playerJson?.url;
+  if (!playerUrl) {
+    process.stdout.write('⏳ [API de SoloLatino ocupada, esperando 15s]... ');
+    await sleep(15000);
+    const retryApi = await httpsRequest('https://sololatino.net/api/player-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Cookie': cookieString(cookieJar),
+        'Referer': targetUrl,
+        'X-XSRF-TOKEN': xsrfToken,
+        'Origin': 'https://sololatino.net'
+      }
+    }, JSON.stringify({ t: playerToken }));
+    try { playerJson = JSON.parse(retryApi.data); } catch (e) {}
+    playerUrl = playerJson?.url;
+  }
   if (!playerUrl) {
     throw new Error('No se obtuvo URL del reproductor');
   }
@@ -241,17 +259,17 @@ async function extractMediafireSingle(targetUrl) {
     });
   }
 
-  // Click & scan con manejo inteligente de rate_limited
+  // Click & scan con manejo inteligente y cooldown real de rate_limited
   await callS({ a: 'click', tok: tok, ts: '1' });
   let scan = await callS({ a: '1', tok: tok });
 
   if (scan && scan.msg === 'rate_limited') {
-    process.stdout.write('⏳ [Rate limit detectado, esperando 8s]... ');
-    await sleep(8000);
+    process.stdout.write('⏳ [Rate limit: enfriando servidor 18s]... ');
+    await sleep(18000);
     scan = await callS({ a: '1', tok: tok });
     if (scan && scan.msg === 'rate_limited') {
-      process.stdout.write('⏳ [esperando 10s más]... ');
-      await sleep(10000);
+      process.stdout.write('⏳ [esperando 25s más]... ');
+      await sleep(25000);
       scan = await callS({ a: '1', tok: tok });
     }
   }
@@ -270,8 +288,8 @@ async function extractMediafireSingle(targetUrl) {
   // Stream endpoint con reintento si hay rate_limited
   let resA2 = await callS({ a: '2', v: serverHash, tok: tok });
   if (resA2 && resA2.msg === 'rate_limited') {
-    process.stdout.write('⏳ [esperando 8s]... ');
-    await sleep(8000);
+    process.stdout.write('⏳ [enfriando servidor 18s]... ');
+    await sleep(18000);
     resA2 = await callS({ a: '2', v: serverHash, tok: tok });
   }
 
@@ -771,7 +789,18 @@ async function main() {
             process.stdout.write(`${progress}: Extrayendo... `);
 
             try {
-              const res = await extractMediafireSingle(ep.url);
+              let res = await extractMediafireSingle(ep.url);
+
+              // Si dio 0.00 MB, reintentar renovación automática
+              if (res.sizeMB === '0.00') {
+                process.stdout.write('⚠️ [0.00 MB, reintentando renovación]... ');
+                await sleep(4000);
+                try {
+                  const retryRes = await extractMediafireSingle(ep.url);
+                  if (retryRes.sizeMB !== '0.00') res = retryRes;
+                } catch (eRetry) {}
+              }
+
               process.stdout.write(`✅ OK (${res.sizeMB} MB)`);
 
               const itemRecord = {
@@ -807,8 +836,14 @@ async function main() {
               process.stdout.write(`❌ Error: ${err.message}\n`);
             }
 
-            // Pausa educada entre episodios para no activar rate-limit de SoloLatino
-            await sleep(2200);
+            // Pausa educada entre episodios
+            await sleep(2800);
+
+            // Cada 6 episodios procesados seguidos, pausa preventiva de 12s para no saturar SoloLatino
+            if ((successCount % 6 === 0) && (i + 1 < selectedEpisodes.length)) {
+              console.log('   ☕ [Pausa preventiva de 12s para evitar bloqueos del servidor]...');
+              await sleep(12000);
+            }
           }
 
           // Guardar en archivo maestro permanente
