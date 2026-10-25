@@ -483,3 +483,23 @@
   margin: 0;
   line-height: 1.5;
 }
+
+.activeSeasonSubheader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.4rem 0.2rem;
+}
+
+.activeSeasonSubheaderTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.activeSeasonSubheaderCount {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  font-weight: 500;
+}

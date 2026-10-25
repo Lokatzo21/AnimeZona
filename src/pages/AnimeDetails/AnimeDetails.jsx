@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Play, Eye, Heart, Check } from 'lucide-react';
+import SeasonCarousel from '../../components/SeasonCarousel/SeasonCarousel';
 import { api } from '../../services/api';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useUI } from '../../contexts/UIContext';
@@ -66,7 +67,12 @@ const AnimeDetails = () => {
       if (eps && eps.length > 0) {
         const seasons = [...new Set(eps.map(ep => ep.season || ep.season_number || 1))].sort((a, b) => a - b);
         if (seasons.length > 0) {
-          setActiveSeason(seasons[0]);
+          const querySeason = Number(new URLSearchParams(location.search).get('season'));
+          if (querySeason && seasons.includes(querySeason)) {
+            setActiveSeason(querySeason);
+          } else {
+            setActiveSeason(seasons[0]);
+          }
         }
       }
       
@@ -447,35 +453,34 @@ const AnimeDetails = () => {
               )}
             </div>
 
-            {/* Season Tabs */}
+            {/* Season Carousel & Subheader */}
             {(() => {
               const seasons = [...new Set(episodes.map(ep => ep.season || ep.season_number || 1))].sort((a, b) => a - b);
-              if (seasons.length > 1) {
-                return (
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                    {seasons.map(season => (
-                      <button
-                        key={season}
-                        onClick={() => setActiveSeason(season)}
-                        style={{
-                          padding: '0.5rem 1.5rem',
-                          borderRadius: '8px',
-                          background: activeSeason === season ? 'var(--primary-color)' : 'rgba(30, 41, 59, 0.5)',
-                          color: 'white',
-                          fontWeight: activeSeason === season ? 'bold' : 'normal',
-                          border: '1px solid',
-                          borderColor: activeSeason === season ? 'var(--primary-color)' : 'rgba(255,255,255,0.1)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Temporada {season}
-                      </button>
-                    ))}
-                  </div>
-                );
-              }
-              return null;
+              const currentSeasonEps = episodes.filter(ep => (ep.season || ep.season_number || 1) === activeSeason);
+
+              return (
+                <>
+                  {seasons.length > 1 && (
+                    <SeasonCarousel
+                      seasons={seasons}
+                      activeSeason={activeSeason}
+                      onSelectSeason={setActiveSeason}
+                      episodes={episodes}
+                    />
+                  )}
+
+                  {seasons.length > 1 && (
+                    <div className={styles.activeSeasonSubheader}>
+                      <span className={styles.activeSeasonSubheaderTitle}>
+                        Temporada {activeSeason}
+                      </span>
+                      <span className={styles.activeSeasonSubheaderCount}>
+                        • {currentSeasonEps.length} {currentSeasonEps.length === 1 ? 'Episodio disponible' : 'Episodios disponibles'}
+                      </span>
+                    </div>
+                  )}
+                </>
+              );
             })()}
 
             <div className={styles.episodesGrid}>
