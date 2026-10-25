@@ -155,6 +155,35 @@ async function searchTmdb(title, isMovie = false) {
   return null;
 }
 
+const tmdbSeasonCache = new Map();
+
+/**
+ * Obtiene el nombre oficial del episodio desde TMDB en español
+ */
+async function getTmdbEpisodeTitle(tmdbId, seasonNumber, episodeNumber, fallbackTitle) {
+  if (!tmdbId) return fallbackTitle;
+  const key = `${tmdbId}-S${seasonNumber}`;
+  let episodes = tmdbSeasonCache.get(key);
+  if (!episodes) {
+    try {
+      const url = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=es-MX`;
+      const res = await httpsRequest(url);
+      if (res.statusCode === 200) {
+        const data = JSON.parse(res.data);
+        episodes = data.episodes || [];
+        tmdbSeasonCache.set(key, episodes);
+      }
+    } catch (e) {}
+  }
+  if (episodes && episodes.length > 0) {
+    const epObj = episodes.find(e => Number(e.episode_number) === Number(episodeNumber));
+    if (epObj && epObj.name && epObj.name.trim() && !/^Episodio\s+\d+$/i.test(epObj.name)) {
+      return epObj.name.trim();
+    }
+  }
+  return fallbackTitle;
+}
+
 /**
  * Consulta en Supabase el último número de episodio para numeración continua
  */
@@ -688,11 +717,15 @@ async function main() {
             const doInsert = (await ask(rl, '\n¿Deseas insertar/actualizar este registro en Supabase? (S/N, Enter = S): ')).toLowerCase();
             if (doInsert !== 'n' && doInsert !== 'no') {
               console.log('⏳ Guardando en Supabase...');
+              let singleEpName = `${sTitle}${isMovie ? '' : ` T${seasonNum}E${epNum}`}`;
+              if (!isMovie && tmdbId) {
+                singleEpName = await getTmdbEpisodeTitle(tmdbId, seasonNum, epNum, singleEpName);
+              }
               const record = {
                 search_title: sTitle,
                 episode_number: epNum,
                 season_number: seasonNum,
-                episode_name: `${sTitle}${isMovie ? '' : ` T${seasonNum}E${epNum}`}`,
+                episode_name: singleEpName,
                 server_name: 'MEDIAFIRE',
                 language: lang,
                 video_url: chosenUrl,
@@ -861,11 +894,14 @@ async function main() {
               process.stdout.write(`✅ OK (${res.sizeMB} MB)`);
             }
 
+            // Obtener el título real y oficial del episodio desde TMDB en español
+            const officialEpName = await getTmdbEpisodeTitle(tmdbId, ep.season, ep.episode, `${sTitle} T${ep.season}E${ep.episode}`);
+
             const itemRecord = {
               search_title: sTitle,
               episode_number: continuousNumber,
               season_number: ep.season,
-              episode_name: `${sTitle} T${ep.season}E${ep.episode}`,
+              episode_name: officialEpName,
               server_name: 'MEDIAFIRE',
               language: lang,
               video_url: (linkTypeChoice === '2' ? res.resolverUrl : res.streamUrl),

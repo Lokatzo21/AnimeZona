@@ -6834,13 +6834,14 @@ export const api = {
 
       // Si ya tiene episodios registrados en Supabase (anime_episodes), construir directamente desde dbEps deduplicados por temporada y episodio
       if (dbEps.length > 0) {
+        const isGenericName = (n) => !n || /^Episodio\s+\d+$/i.test(n) || /T\d+\s*E\d+$/i.test(n) || /^T\d+\s*E\d+/i.test(n);
         const byEpKey = new Map();
         for (const ep of dbEps) {
           const sNum = Number(ep.season_number || 1);
           const epNum = Number(ep.episode_number);
           const key = `${sNum}-${epNum}`;
           const existing = byEpKey.get(key);
-          if (!existing || (!existing.episode_name && ep.episode_name) || (/^Episodio\s+\d+$/i.test(existing.episode_name || '') && ep.episode_name && !/^Episodio\s+\d+$/i.test(ep.episode_name))) {
+          if (!existing || (!existing.episode_name && ep.episode_name) || (isGenericName(existing.episode_name) && ep.episode_name && !isGenericName(ep.episode_name))) {
             byEpKey.set(key, ep);
           }
         }
@@ -6887,10 +6888,11 @@ export const api = {
         }
       }
 
+      const isGenericEpName = (n) => !n || /^Episodio\s+\d+$/i.test(n) || /T\d+\s*E\d+$/i.test(n) || /^T\d+\s*E\d+/i.test(n);
       const findBestDbEp = (epNum) => {
         if (!dbEps || dbEps.length === 0) return {};
         return (
-          dbEps.find(e => e.episode_number === epNum && e.episode_name && !/^Episodio\s+\d+$/i.test(e.episode_name)) ||
+          dbEps.find(e => e.episode_number === epNum && e.episode_name && !isGenericEpName(e.episode_name)) ||
           dbEps.find(e => e.episode_number === epNum && e.episode_name) ||
           dbEps.find(e => e.episode_number === epNum) ||
           {}

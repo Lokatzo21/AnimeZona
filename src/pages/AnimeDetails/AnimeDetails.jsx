@@ -487,6 +487,7 @@ const AnimeDetails = () => {
                 
                 let cleanTitle = ep.title || '';
                 cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
+                if (/^(.+\s+)?T\d+\s*E\d+$/i.test(cleanTitle.trim())) cleanTitle = `Episodio ${index + 1}`;
                 const displayTitle = sagaInfo?.isParentCollection
                   ? cleanTitle
                   : `T${activeSeason}E${index + 1} - ${cleanTitle}`;
