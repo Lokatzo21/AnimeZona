@@ -572,6 +572,19 @@ async function main() {
         const rawTmdbId = (await ask(rl, tmdbPrompt)).trim();
         const tmdbId = rawTmdbId || detectedTmdbId;
 
+        // Si se ingresó o cambió el TMDB ID manualmente, obtener metadatos oficiales completos de TMDB
+        if (tmdbId && (!tmdbInfo || String(tmdbInfo.id) !== String(tmdbId))) {
+          try {
+            const mRes = await httpsGet(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-MX`);
+            if (mRes.status === 200) {
+              tmdbInfo = JSON.parse(mRes.body);
+            } else {
+              const tvRes = await httpsGet(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-MX`);
+              if (tvRes.status === 200) tmdbInfo = JSON.parse(tvRes.body);
+            }
+          } catch (e) {}
+        }
+
         const epNum = parseInt((await ask(rl, `Número de Episodio [1]: `)).trim() || '1', 10);
         const seasonNum = parseInt((await ask(rl, `Temporada [1]: `)).trim() || '1', 10);
         const epName = (await ask(rl, `Nombre del Episodio [${sTitle}]: `)).trim() || sTitle;

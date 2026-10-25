@@ -6499,6 +6499,22 @@ export const api = {
                   mapped.banner = mapped.backdrop;
                   mapped.hasBackdrop = true;
                 }
+                if (!mapped.hasEnrichedPoster || !mapped.image || mapped.image.includes('placeholder.com')) {
+                  if (tmdbExtra.poster_path) {
+                    mapped.image = `https://image.tmdb.org/t/p/w500${tmdbExtra.poster_path}`;
+                    mapped.hasEnrichedPoster = true;
+                  }
+                }
+                if (!mapped.description || mapped.description === 'Sin descripción disponible.') {
+                  if (tmdbExtra.overview) {
+                    mapped.description = tmdbExtra.overview;
+                  }
+                }
+                if (!mapped.genres || mapped.genres.length === 0 || (mapped.genres.length === 1 && mapped.genres[0] === 'General')) {
+                  if (tmdbExtra.genres && tmdbExtra.genres.length > 0) {
+                    mapped.genres = tmdbExtra.genres.map(g => g.name || g);
+                  }
+                }
                 if ((!mapped.score || mapped.score === 'N/A') && tmdbExtra.vote_average) {
                   mapped.score = Number(tmdbExtra.vote_average).toFixed(1);
                 }

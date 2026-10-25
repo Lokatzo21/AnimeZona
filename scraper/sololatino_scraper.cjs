@@ -542,6 +542,21 @@ async function main() {
 
         const sTitle = (await ask(rl, `Título / Búsqueda [${defaultTitle}]: `)) || defaultTitle;
         const tmdbId = (await ask(rl, `ID TMDB [${defaultTmdbId}]: `)) || defaultTmdbId;
+
+        // Si se ingresó o cambió el TMDB ID manualmente, obtener metadatos oficiales completos de TMDB
+        if (tmdbId && (!tmdbData || String(tmdbData.id) !== String(tmdbId))) {
+          try {
+            const fetchEndpoint = isMovie ? 'movie' : 'tv';
+            const fetchRes = await httpsRequest(`https://api.themoviedb.org/3/${fetchEndpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-MX`);
+            if (fetchRes.statusCode === 200) {
+              tmdbData = JSON.parse(fetchRes.data);
+              if (tmdbData.poster_path) {
+                console.log(`🖼️  Póster Oficial Recuperado: https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`);
+              }
+            }
+          } catch (e) {}
+        }
+
         const rawLang = (await ask(rl, `Idioma [latino]: `)) || 'latino';
         const lang = normalizeLanguage(rawLang);
 
