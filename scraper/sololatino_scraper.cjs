@@ -324,6 +324,36 @@ async function extractMediafireSingle(targetUrl) {
       if (headRes.contentLength) {
         sizeMB = (parseInt(headRes.contentLength, 10) / (1024 * 1024)).toFixed(2);
       }
+    } else if (permanentLink) {
+      // Si el enlace de SoloLatino vino expirado (302 repair), renovarlo directamente de Mediafire
+      try {
+        const pageRes = await httpsRequest(permanentLink);
+        if (pageRes.statusCode === 200) {
+          const directMatch = pageRes.data.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
+          if (directMatch) {
+            mediafireDirect = directMatch[0];
+            const u2 = new URL(mediafireDirect);
+            const head2 = await new Promise((resolve) => {
+              const req = https.request({
+                hostname: u2.hostname,
+                path: u2.pathname,
+                method: 'HEAD',
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 8000
+              }, (res) => resolve({ status: res.statusCode, contentLength: res.headers['content-length'] }));
+              req.on('timeout', () => { req.destroy(); resolve({ status: 408 }); });
+              req.on('error', () => resolve({ status: 500 }));
+              req.end();
+            });
+            if (head2.status === 200 || head2.status === 206) {
+              isAlive = true;
+              if (head2.contentLength) {
+                sizeMB = (parseInt(head2.contentLength, 10) / (1024 * 1024)).toFixed(2);
+              }
+            }
+          }
+        }
+      } catch (errRenew) {}
     }
   } catch (e) {}
 
