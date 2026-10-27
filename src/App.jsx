@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar/Navbar';
 import DataRepairer from './components/DataRepairer';
+import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home/Home';
 import AnimeDetails from './pages/AnimeDetails/AnimeDetails';
 import Watch from './pages/Watch/Watch';
@@ -25,18 +26,20 @@ function App() {
         <DataRepairer />
         <Navbar />
         <main className={`${isWatchPage ? 'watch-page-container' : isHomePage ? 'home-page-container' : 'container'} animate-fade-in`}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/anime/:id" element={<AnimeDetails />} />
-            <Route path="/watch/:id/:episode" element={<Watch />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/secret" element={<SecretZone />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/catalog" element={<Catalog />} />
-            <Route path="/movies" element={<Navigate to="/catalog?type=peliculas" replace />} />
-            <Route path="/movie-watch" element={<Navigate to="/catalog?type=peliculas" replace />} />
-            <Route path="/login" element={<Login />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/anime/:id" element={<AnimeDetails />} />
+              <Route path="/watch/:id/:episode" element={<Watch />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/secret" element={<SecretZone />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/catalog" element={<Catalog />} />
+              <Route path="/movies" element={<Navigate to="/catalog?type=peliculas" replace />} />
+              <Route path="/movie-watch" element={<Navigate to="/catalog?type=peliculas" replace />} />
+              <Route path="/login" element={<Login />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
       </UIProvider>
     </AuthProvider>

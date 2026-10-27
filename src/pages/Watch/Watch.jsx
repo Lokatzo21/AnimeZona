@@ -145,6 +145,7 @@ const Watch = () => {
   const [animeInfo, setAnimeInfo] = useState(null);
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [serverLoading, setServerLoading] = useState(false);
   const [language, setLanguage] = useState('sub'); // 'sub', 'latino', 'castellano'
   const [continueWatching, setContinueWatching] = useLocalStorage('continueWatching', []);
   const [watchedEpisodes, setWatchedEpisodes] = useLocalStorage('watchedEpisodes', []);
@@ -189,13 +190,48 @@ const Watch = () => {
   const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
   const [playbackError, setPlaybackError] = useState(false);
+
+  // Derived episode states safely computed at top-level
+  const currentEpIndex = React.useMemo(() => {
+    return episodes.findIndex(ep => String(ep?.id ?? '') === String(episode ?? '') || String(ep?.episode_number ?? '') === String(episode ?? ''));
+  }, [episodes, episode]);
+
+  const currentEp = currentEpIndex >= 0 ? episodes[currentEpIndex] : null;
+  const currentSeason = querySeason || (currentEp ? (currentEp.season || currentEp.season_number || 1) : 1);
+  const prevEpisode = currentEpIndex > 0 ? episodes[currentEpIndex - 1] : null;
+  const nextEpisode = currentEpIndex >= 0 && currentEpIndex < episodes.length - 1 ? episodes[currentEpIndex + 1] : null;
+
+  const isMovie = Boolean(
+    animeInfo?.type === 'Película' ||
+    animeInfo?.contentType === 'peliculas' ||
+    animeInfo?.isMovie ||
+    episodes.length === 1
+  );
+
+  const currentEpTitle = React.useMemo(() => {
+    let title = `Episodio ${episode}`;
+    if (isMovie) {
+      title = episodes[0]?.title && !episodes[0].title.startsWith('Episodio 1')
+        ? episodes[0].title
+        : animeInfo?.title || 'Película Completa';
+    } else if (currentEpIndex >= 0 && currentEp) {
+      const epSeason = currentEp.season || currentEp.season_number || 1;
+      const seasonEps = episodes.filter(e => (e?.season || e?.season_number || 1) === epSeason);
+      const epIndexInSeason = seasonEps.findIndex(e => String(e?.id ?? '') === String(currentEp.id ?? ''));
+      let cleanTitle = currentEp.title || '';
+      cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
+      const indexNum = epIndexInSeason >= 0 ? epIndexInSeason + 1 : (currentEp.episode_number || episode);
+      title = `T${epSeason}E${indexNum} - ${cleanTitle}`;
+    }
+    return title;
+  }, [isMovie, episodes, episode, animeInfo?.title, currentEpIndex, currentEp]);
+
   const isLiveStream = Boolean(
     (animeInfo?.title && /24\/7|en vivo/i.test(animeInfo.title)) ||
+    (currentEpTitle && /24\/7|en vivo/i.test(currentEpTitle)) ||
     (activeServer?.url && /streamproxy|\.p3x8|arcando/i.test(activeServer.url)) ||
     (activeServer?.name && /arcando/i.test(activeServer.name))
   );
-  const currentEp = episodes.find(ep => String(ep?.id ?? '') === String(episode ?? ''));
-  const currentSeason = currentEp ? (currentEp.season || 1) : 1;
 
   // Admin Config States
   const [introStartInput, setIntroStartInput] = useState('');
@@ -255,13 +291,7 @@ const Watch = () => {
     }
   };
 
-  useEffect(() => {
-    setPromptShownForEp(false);
-    setShowResumePrompt(false);
-    setShowSkipIntro(false);
-    setShowNextEpisode(false);
-    lastSavedTime.current = 0;
-  }, [episode]);
+
 
   useEffect(() => {
     setResolvedFbUrl(null);
@@ -580,8 +610,12 @@ const Watch = () => {
 
   // Auto-scroll al reproductor cuando cambia el episodio y termina de cargar
   useEffect(() => {
+    let timer1 = null;
+    let timer2 = null;
+
     if (!loading && videoContainerRef.current) {
-      setTimeout(() => {
+      timer1 = setTimeout(() => {
+        if (!videoContainerRef.current) return;
         const rect = videoContainerRef.current.getBoundingClientRect();
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         
@@ -598,9 +632,10 @@ const Watch = () => {
 
     // Auto-scroll de la lista de episodios en la barra lateral
     if (!loading && activeEpisodeRef.current && sidebarListRef.current) {
-      setTimeout(() => {
+      timer2 = setTimeout(() => {
         const container = sidebarListRef.current;
         const activeItem = activeEpisodeRef.current;
+        if (!container || !activeItem) return;
         
         let scrollPos;
         if (window.innerWidth <= 1024) {
@@ -612,54 +647,105 @@ const Watch = () => {
         }
         
         container.scrollTo({
-          top: scrollPos,
+          top: Math.max(0, scrollPos),
           behavior: 'smooth'
         });
       }, 600);
     }
-  }, [episode, loading, episodes]);
 
+    return () => {
+      if (timer1) clearTimeout(timer1);
+      if (timer2) clearTimeout(timer2);
+    };
+  }, [episode, loading, episodes.length]);
+
+  // Carga inicial del anime y sus episodios (solo cuando cambia el anime id)
   useEffect(() => {
+    let isCancelled = false;
     const fetchWatchData = async () => {
       setLoading(true);
-      
-      // Fetch secuencial para evitar rate limit de Jikan
-      const info = await api.getAnimeInfo(id);
-      await new Promise(r => setTimeout(r, 400));
-      
-      const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
-      
-      setAnimeInfo(info);
-      setEpisodes(eps);
-      setLoading(false);
+      try {
+        const info = await api.getAnimeInfo(id);
+        if (isCancelled) return;
+        const eps = await api.getAnimeEpisodes(id, info?.totalEpisodes);
+        if (isCancelled) return;
+        setAnimeInfo(info);
+        setEpisodes(eps || []);
+      } catch (err) {
+        console.error("Error al cargar datos del anime:", err);
+      } finally {
+        if (!isCancelled) setLoading(false);
+      }
     };
     fetchWatchData();
-  }, [id, episode]);
+    return () => { isCancelled = true; };
+  }, [id]);
 
   React.useEffect(() => {
     if (animeInfo) {
-      document.title = `Viendo ${animeInfo.title} - Episodio ${episode}`;
+      document.title = `Viendo ${animeInfo.title} - ${currentEpTitle}`;
     } else {
       document.title = `Viendo Anime`;
     }
-  }, [animeInfo, episode]);
+  }, [animeInfo, currentEpTitle]);
 
-  // Efecto separado para actualizar el reproductor cuando cambia el episodio
+  // Efecto para actualizar el reproductor cuando cambia el episodio o los episodios cargan
   useEffect(() => {
+    let isCurrent = true;
+
+    setPromptShownForEp(false);
+    setShowResumePrompt(false);
+    setShowSkipIntro(false);
+    setShowNextEpisode(false);
+    setPlaybackError(false);
+    lastSavedTime.current = 0;
+
+    if (stallTimeoutRef.current) {
+      clearTimeout(stallTimeoutRef.current);
+      stallTimeoutRef.current = null;
+    }
+
+    if (nativeVideoRef.current) {
+      try {
+        nativeVideoRef.current.pause();
+        nativeVideoRef.current.removeAttribute('src');
+        nativeVideoRef.current.load();
+      } catch (e) {}
+    }
+
+    if (hlsInstanceRef.current) {
+      try {
+        hlsInstanceRef.current.destroy();
+        hlsInstanceRef.current = null;
+      } catch (e) {}
+    }
+
+    setResolvedFbUrl(null);
+    setFbQualities(null);
+    setCurrentFbQuality('');
+    setShowQualityMenu(false);
+    setResolvedMfUrl(null);
+
+    if (!animeInfo) return;
+
     const fetchServers = async () => {
-      if (animeInfo) {
-        const currentEp = episodes.find(ep => {
-          const matchesEp = ep.id?.toString() === episode.toString() || ep.episode_number?.toString() === episode.toString();
+      setServerLoading(true);
+      setActiveServer(null);
+
+      try {
+        const curEp = episodes.find(ep => {
+          const matchesEp = String(ep?.id ?? '') === String(episode ?? '') || String(ep?.episode_number ?? '') === String(episode ?? '');
           if (querySeason) {
-            return matchesEp && (ep.season === querySeason || ep.season_number === querySeason);
+            return matchesEp && ((ep.season || ep.season_number) === querySeason);
           }
           return matchesEp;
         });
-        const seasonNumber = querySeason || (currentEp ? (currentEp.season || currentEp.season_number) : 1);
-        const correctEpisodeId = currentEp ? (currentEp.episode_number || currentEp.id) : episode;
-        
+        const seasonNumber = querySeason || (curEp ? (curEp.season || curEp.season_number) : 1);
+        const correctEpisodeId = curEp ? (curEp.episode_number || curEp.id) : episode;
+
         // Obtenemos todos los servidores (de todos los idiomas) para este episodio
         const serversData = await api.getEpisodeServers(animeInfo.title, correctEpisodeId, 'sub', animeInfo.id, seasonNumber);
+        if (!isCurrent) return;
 
         const normalizedServers = (serversData || []).map(s => ({
           ...s,
@@ -683,8 +769,10 @@ const Watch = () => {
         const langServers = sortedServers.filter(s => s.lang === defaultLang || s.lang === 'none');
         if (langServers.length > 0) {
           setActiveServer(langServers[0]);
+        } else if (sortedServers.length > 0) {
+          setActiveServer(sortedServers[0]);
         } else {
-           setActiveServer(sortedServers[0]); // fallback
+          setActiveServer(null);
         }
 
         const isSecret = secretLikes.some(a => String(a.id) === String(animeInfo.id));
@@ -750,10 +838,23 @@ const Watch = () => {
         } else {
           setWatchedAnimes(updateWatchedAnimes);
         }
+      } catch (err) {
+        console.error("Error al obtener servidores para episodio:", err);
+      } finally {
+        if (isCurrent) setServerLoading(false);
       }
     };
+
     fetchServers();
-  }, [animeInfo, episode, episodes]); // quitamos 'language' de dependencias porque ya no fetchea de nuevo
+
+    return () => {
+      isCurrent = false;
+      if (stallTimeoutRef.current) {
+        clearTimeout(stallTimeoutRef.current);
+        stallTimeoutRef.current = null;
+      }
+    };
+  }, [id, episode, animeInfo, episodes, querySeason]);
 
   // Handler para cuando el usuario cambia de idioma manualmente
   const handleLanguageChange = (newLang) => {
@@ -765,33 +866,16 @@ const Watch = () => {
       }
   };
 
-  if (loading) return <div className={styles.loading}>Cargando episodio...</div>;
+  if (loading && !animeInfo) return <div className={styles.loading}>Cargando episodio...</div>;
 
-  // Helper functions for prev/next
-  const currentEpIndex = episodes.findIndex(ep => ep.id.toString() === episode.toString());
-  const prevEpisode = currentEpIndex > 0 ? episodes[currentEpIndex - 1] : null;
-  const nextEpisode = currentEpIndex >= 0 && currentEpIndex < episodes.length - 1 ? episodes[currentEpIndex + 1] : null;
-  
-  const isMovie = Boolean(
-    animeInfo?.type === 'Película' ||
-    animeInfo?.contentType === 'peliculas' ||
-    animeInfo?.isMovie ||
-    episodes.length === 1
-  );
-
-  let currentEpTitle = `Episodio ${episode}`;
-  if (isMovie) {
-    currentEpTitle = episodes[0]?.title && !episodes[0].title.startsWith('Episodio 1')
-      ? episodes[0].title
-      : animeInfo?.title || 'Película Completa';
-  } else if (currentEpIndex >= 0) {
-      const epData = episodes[currentEpIndex];
-      const epSeason = epData.season || epData.season_number || 1;
-      const seasonEps = episodes.filter(e => (e.season || e.season_number || 1) === epSeason);
-      const epIndexInSeason = seasonEps.findIndex(e => e.id.toString() === episode.toString());
-      let cleanTitle = epData.title || '';
-      cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
-      currentEpTitle = `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
+  if (!loading && !animeInfo) {
+    return (
+      <div className={styles.watchContainer} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+        <h2>No pudimos encontrar la información de este anime</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: '1rem 0' }}>El título no está disponible o hubo un problema de conexión.</p>
+        <Link to="/" style={{ color: 'var(--primary-accent-light)', textDecoration: 'underline' }}>Volver al inicio</Link>
+      </div>
+    );
   }
 
   // Filtrar servidores a mostrar según el idioma seleccionado y orden de prioridad oficial
@@ -805,7 +889,7 @@ const Watch = () => {
       <div className={styles.header}>
         <Link to={`/anime/${id}`} className={styles.backLink}>
           <ChevronLeft size={20} />
-          Volver a {animeInfo?.title}
+          Volver a {animeInfo?.title || 'Anime'}
         </Link>
         <h1 className={styles.title}>{currentEpTitle}</h1>
       </div>
@@ -860,7 +944,14 @@ const Watch = () => {
           <div className={styles.playerSection}>
             <div className={`${styles.playerContainer} ${cinemaMode ? styles.playerContainerCinema : ''}`} ref={videoContainerRef}>
               <div className={styles.videoWrapper}>
-                {activeServer ? (
+                {serverLoading ? (
+                  <div className={styles.loadingServer}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ width: '42px', height: '42px', border: '3px solid rgba(255,255,255,0.15)', borderTopColor: '#ff3d00', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></div>
+                      <span style={{ fontSize: '1rem', color: '#e2e8f0', fontWeight: 500 }}>Cargando {currentEpTitle}...</span>
+                    </div>
+                  </div>
+                ) : activeServer ? (
                   (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) ? (
                     fbLoading ? (
                       <div className={styles.loadingServer}>Hackeando a Mark Zuckerberg... (Extrayendo MP4 de Facebook)</div>
@@ -882,7 +973,7 @@ const Watch = () => {
                           onPause={handleTimeUpdate}
                           onWaiting={handleVideoWaiting}
                           onPlaying={handleVideoPlaying}
-                          onClick={() => { if(!controlsVisible) { nativeVideoRef.current.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
+                          onClick={() => { if(!controlsVisible) { nativeVideoRef.current?.paused ? nativeVideoRef.current.play().catch(() => {}) : nativeVideoRef.current.pause() } }}
                         ></video>
                         
                         {showSkipIntro && (
@@ -1140,7 +1231,17 @@ const Watch = () => {
                     ></iframe>
                   )
                 ) : (
-                  <div className={styles.loadingServer}>Cargando servidor...</div>
+                  <div className={styles.loadingServer}>
+                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                      <p style={{ fontSize: '1.1rem', marginBottom: '10px' }}>No hay servidores disponibles para este episodio.</p>
+                      <button 
+                        onClick={() => handleLanguageChange(language)} 
+                        style={{ background: '#ff3d00', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        Reintentar
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -1255,18 +1356,18 @@ const Watch = () => {
               </div>
               <div className={styles.episodesList} ref={sidebarListRef}>
                 {episodes.map(ep => {
-                  const isActive = ep.id.toString() === episode.toString();
-                  const isNext = nextEpisode && ep.id.toString() === nextEpisode.id.toString();
-                  const thumb = animeInfo.image; // Usamos la portada del anime
+                  const isActive = String(ep?.id ?? '') === String(episode ?? '') || String(ep?.episode_number ?? '') === String(episode ?? '');
+                  const isNext = nextEpisode && (String(ep?.id ?? '') === String(nextEpisode?.id ?? '') || String(ep?.episode_number ?? '') === String(nextEpisode?.episode_number ?? ''));
+                  const thumb = animeInfo?.image || '';
                   
-                  const epSeason = ep.season || ep.season_number || 1;
-                  const seasonEps = episodes.filter(e => (e.season || e.season_number || 1) === epSeason);
-                  const epIndexInSeason = seasonEps.findIndex(e => e.id.toString() === ep.id.toString());
-                  let cleanTitle = ep.title || '';
+                  const epSeason = ep?.season || ep?.season_number || 1;
+                  const seasonEps = episodes.filter(e => (e?.season || e?.season_number || 1) === epSeason);
+                  const epIndexInSeason = seasonEps.findIndex(e => String(e?.id ?? '') === String(ep?.id ?? ''));
+                  let cleanTitle = ep?.title || '';
                   cleanTitle = cleanTitle.replace(/^T\d+E\d+\s*-\s*/i, '');
                   const displayTitle = isMovie
-                    ? (ep.title && !ep.title.startsWith('Episodio 1') ? ep.title : animeInfo.title)
-                    : `T${epSeason}E${epIndexInSeason + 1} - ${cleanTitle}`;
+                    ? (ep?.title && !ep.title.startsWith('Episodio 1') ? ep.title : animeInfo?.title || 'Película Completa')
+                    : `T${epSeason}E${epIndexInSeason >= 0 ? epIndexInSeason + 1 : (ep?.episode_number || ep?.id)} - ${cleanTitle}`;
 
                   return (
                     <Link 
