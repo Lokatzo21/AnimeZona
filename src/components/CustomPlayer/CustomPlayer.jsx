@@ -80,12 +80,17 @@ const CustomPlayer = ({ movieData }) => {
     }
 
     const loadVideo = () => {
-      if (Hls.isSupported() && src.includes('m3u8')) {
+      const isHls = src.includes('m3u8') || src.includes('streamproxy') || src.includes('.p3x8') || src.includes('arcando');
+      if (Hls.isSupported() && isHls) {
         if (hlsRef.current) {
           hlsRef.current.destroy();
         }
         const hls = new Hls({
           maxBufferLength: 30,
+          liveSyncDurationCount: 3,
+          liveMaxLatencyDurationCount: 10,
+          lowLatencyMode: false,
+          backBufferLength: 30
         });
         hlsRef.current = hls;
         

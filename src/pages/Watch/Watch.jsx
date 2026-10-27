@@ -60,8 +60,8 @@ const sortServersByPriority = (srvList) => {
     if (!isA_mp4 && isB_mp4) return 1;
 
     // 2. Streams HLS adaptativos (.m3u8) de segundo (#2)
-    const isA_hls = a.url?.includes('.m3u8');
-    const isB_hls = b.url?.includes('.m3u8');
+    const isA_hls = a.url?.includes('.m3u8') || a.url?.includes('streamproxy') || a.url?.includes('.p3x8') || a.name?.toUpperCase().includes('ARCANDO');
+    const isB_hls = b.url?.includes('.m3u8') || b.url?.includes('streamproxy') || b.url?.includes('.p3x8') || b.name?.toUpperCase().includes('ARCANDO');
     if (isA_hls && !isB_hls) return -1;
     if (!isA_hls && isB_hls) return 1;
 
@@ -189,6 +189,11 @@ const Watch = () => {
   const videoContainerRef = useRef(null);
   const lastSavedTime = useRef(0);
   const [playbackError, setPlaybackError] = useState(false);
+  const isLiveStream = Boolean(
+    (animeInfo?.title && /24\/7|en vivo/i.test(animeInfo.title)) ||
+    (activeServer?.url && /streamproxy|\.p3x8|arcando/i.test(activeServer.url)) ||
+    (activeServer?.name && /arcando/i.test(activeServer.name))
+  );
   const currentEp = episodes.find(ep => String(ep?.id ?? '') === String(episode ?? ''));
   const currentSeason = currentEp ? (currentEp.season || 1) : 1;
 
@@ -326,13 +331,25 @@ const Watch = () => {
     const streamUrl = activeServer?.url;
     if (!streamUrl) return;
 
-    if (streamUrl.includes('.m3u8')) {
+    const isLive = Boolean(
+      (animeInfo?.title && /24\/7|en vivo/i.test(animeInfo.title)) ||
+      (currentEpTitle && /24\/7|en vivo/i.test(currentEpTitle)) ||
+      (streamUrl && /streamproxy|\.p3x8|arcando/i.test(streamUrl)) ||
+      (activeServer?.name && /arcando/i.test(activeServer.name))
+    );
+    const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('streamproxy') || streamUrl.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name));
+
+    if (isHls) {
       const video = nativeVideoRef.current;
       if (video) {
         if (Hls.isSupported()) {
           const hls = new Hls({
             maxBufferLength: 30,
-            enableWorker: true
+            enableWorker: true,
+            lowLatencyMode: isLive ? false : true,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 10,
+            backBufferLength: 30
           });
           hls.loadSource(streamUrl);
           hls.attachMedia(video);
@@ -388,7 +405,7 @@ const Watch = () => {
       setQualityChangeTime(null);
       return;
     }
-    if (promptShownForEp) return; // Ya se le preguntó para este episodio
+    if (isLiveStream || promptShownForEp) return; // Ya se le preguntó para este episodio
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
     if (progress && progress > 5) {
@@ -407,7 +424,7 @@ const Watch = () => {
   useEffect(() => {
     const key = `${id}-${episode}`;
     const progress = videoProgress?.[key];
-    if (progress && progress > 5 && !promptShownForEp && nativeVideoRef.current && nativeVideoRef.current.readyState >= 1) { if (nativeVideoRef.current.currentTime < 5) { setSavedTime(progress); setShowResumePrompt(true); setPromptShownForEp(true); nativeVideoRef.current.pause(); } else { setPromptShownForEp(true); } }
+    if (!isLiveStream && progress && progress > 5 && !promptShownForEp && nativeVideoRef.current && nativeVideoRef.current.readyState >= 1) { if (nativeVideoRef.current.currentTime < 5) { setSavedTime(progress); setShowResumePrompt(true); setPromptShownForEp(true); nativeVideoRef.current.pause(); } else { setPromptShownForEp(true); } }
   }, [videoProgress, episode, id, promptShownForEp]);
 
   const handleTimeUpdate = () => {
@@ -431,7 +448,7 @@ const Watch = () => {
     }
 
     // Guardar progreso cada 15 segundos
-    if (Math.abs(currentTime - lastSavedTime.current) > 15) {
+    if (!isLiveStream && Math.abs(currentTime - lastSavedTime.current) > 15) {
       lastSavedTime.current = currentTime;
       const key = `${id}-${episode}`;
       setVideoProgress(prev => ({
@@ -1011,12 +1028,12 @@ const Watch = () => {
                         )}
                       </>
                     )
-                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8')) ? (
+                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name))) ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
                         key={activeServer.url}
-                        src={activeServer.url?.includes('.m3u8') ? undefined : activeServer.url} 
+                        src={(activeServer.url?.includes('.m3u8') || activeServer.url?.includes('streamproxy') || activeServer.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name))) ? undefined : activeServer.url} 
                         controls={controlsVisible}
                         playsInline
                         webkit-playsinline="true"
@@ -1135,7 +1152,7 @@ const Watch = () => {
                 <span>{cinemaMode ? 'Encender luz' : 'Apagar luz'}</span>
               </button>
               
-              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
+              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
                 <>
                   <button onClick={handleDoubleClick} className={styles.toolbarBtn} title="Pantalla Completa">
                     <Maximize size={18} />
