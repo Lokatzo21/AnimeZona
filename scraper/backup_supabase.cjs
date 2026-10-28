@@ -4,6 +4,7 @@ const { Client } = require('./node_modules/pg');
 
 const DB_CONN = 'postgresql://postgres:M@nuel21M@xMel&&Negra@db.xmlobzzlszwprjtrkicv.supabase.co:5432/postgres';
 const BASE_BACKUP_DIR = 'M:\\BD STREAMING';
+const SUPABASE_STORAGE_BASE = 'https://xmlobzzlszwprjtrkicv.supabase.co/storage/v1/object/public';
 
 function formatSQLValue(val) {
   if (val === null || val === undefined) return 'NULL';
@@ -39,6 +40,18 @@ function getTimestamp() {
   return `${YYYY}-${MM}-${DD}_${HH}-${mm}-${ss}`;
 }
 
+async function downloadStorageFile(bucket, objectPath, localDest) {
+  const url = `${SUPABASE_STORAGE_BASE}/${bucket}/${encodeURI(objectPath)}`;
+  const dir = path.dirname(localDest);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} al descargar ${objectPath}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(localDest, buffer);
+  return buffer.length;
+}
+
 async function runBackup() {
   const startTime = Date.now();
   console.log('================================================================');
@@ -65,18 +78,17 @@ async function runBackup() {
     await client.connect();
     console.log('✅ Conectado con éxito.\n');
 
-    // 1. Obtener todas las tablas del esquema público
+    // 1. Tablas
     const tablesRes = await client.query(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
       ORDER BY table_name;
     `);
-
     const tables = tablesRes.rows.map(r => r.table_name);
     console.log(`📋 Tablas encontradas (${tables.length}): ${tables.join(', ')}\n`);
 
-    // 2. Extraer Metadatos para el Esquema (DDL)
+    // 2. Metadatos de columnas, llaves e índices
     const colsRes = await client.query(`
       SELECT table_name, column_name, data_type, udt_name, is_nullable, column_default, character_maximum_length
       FROM information_schema.columns
@@ -114,9 +126,34 @@ async function runBackup() {
       WHERE schemaname = 'public';
     `);
 
-    // Construir DDL del Esquema
+    // 3. Funciones y Triggers
+    const funcsRes = await client.query(`
+      SELECT proname, pg_get_functiondef(oid) as def 
+      FROM pg_proc 
+      WHERE proname IN ('fn_normalize_anime_episode', 'rls_auto_enable');
+    `);
+
+    const trigsRes = await client.query(`
+      SELECT 
+        trigger_name, 
+        event_manipulation, 
+        event_object_table, 
+        action_statement, 
+        action_timing
+      FROM information_schema.triggers 
+      WHERE trigger_schema = 'public';
+    `);
+
+    // 4. Políticas de Seguridad RLS
+    const polsRes = await client.query(`
+      SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check 
+      FROM pg_policies 
+      WHERE schemaname = 'public';
+    `);
+
+    // Construcción del Esquema DDL
     let schemaSql = `-- =============================================================\n`;
-    schemaSql += `-- ESQUEMA DE TABLAS (SCHEMA VISUALIZER DDL) - SUPABASE\n`;
+    schemaSql += `-- ESQUEMA DE BASE DE DATOS (TABLAS, ÍNDICES, FUNCIONES, TRIGGERS Y RLS)\n`;
     schemaSql += `-- Generado: ${new Date().toISOString()}\n`;
     schemaSql += `-- =============================================================\n\n`;
 
@@ -130,12 +167,8 @@ async function runBackup() {
 
       for (const c of cols) {
         let def = `  "${c.column_name}" ${mapPostgresType(c)}`;
-        if (c.column_default) {
-          def += ` DEFAULT ${c.column_default}`;
-        }
-        if (c.is_nullable === 'NO') {
-          def += ` NOT NULL`;
-        }
+        if (c.column_default) def += ` DEFAULT ${c.column_default}`;
+        if (c.is_nullable === 'NO') def += ` NOT NULL`;
         colDefs.push(def);
       }
 
@@ -152,7 +185,7 @@ async function runBackup() {
     }
 
     schemaSql += `-- -------------------------------------------------------------\n`;
-    schemaSql += `-- ÍNDICES Y LLAVES ÚNICAS\n`;
+    schemaSql += `-- ÍNDICES\n`;
     schemaSql += `-- -------------------------------------------------------------\n`;
     for (const idx of idxRes.rows) {
       if (!idx.indexdef.includes('_pkey')) {
@@ -161,14 +194,40 @@ async function runBackup() {
     }
     schemaSql += `\n`;
 
-    // Guardar archivo de esquema DDL
-    const schemaPath = path.join(targetDir, 'esquema_tablas.sql');
-    fs.writeFileSync(schemaPath, schemaSql, 'utf-8');
+    schemaSql += `-- -------------------------------------------------------------\n`;
+    schemaSql += `-- FUNCIONES\n`;
+    schemaSql += `-- -------------------------------------------------------------\n`;
+    for (const f of funcsRes.rows) {
+      schemaSql += `${f.def};\n\n`;
+    }
 
-    // 3. Extraer Datos de las Tablas
+    schemaSql += `-- -------------------------------------------------------------\n`;
+    schemaSql += `-- TRIGGERS\n`;
+    schemaSql += `-- -------------------------------------------------------------\n`;
+    for (const t of trigsRes.rows) {
+      schemaSql += `CREATE OR REPLACE TRIGGER ${t.trigger_name} ${t.action_timing} ${t.event_manipulation} ON public."${t.event_object_table}" FOR EACH ROW ${t.action_statement};\n`;
+    }
+    schemaSql += `\n`;
+
+    schemaSql += `-- -------------------------------------------------------------\n`;
+    schemaSql += `-- POLÍTICAS DE ACCESO (RLS)\n`;
+    schemaSql += `-- -------------------------------------------------------------\n`;
+    for (const p of polsRes.rows) {
+      let roleStr = Array.isArray(p.roles) ? p.roles.join(', ') : String(p.roles || 'public');
+      schemaSql += `ALTER TABLE public."${p.tablename}" ENABLE ROW LEVEL SECURITY;\n`;
+      schemaSql += `DROP POLICY IF EXISTS "${p.policyname}" ON public."${p.tablename}";\n`;
+      schemaSql += `CREATE POLICY "${p.policyname}" ON public."${p.tablename}" FOR ${p.cmd} TO ${roleStr}`;
+      if (p.qual) schemaSql += ` USING (${p.qual})`;
+      if (p.with_check) schemaSql += ` WITH CHECK (${p.with_check})`;
+      schemaSql += `;\n\n`;
+    }
+
+    fs.writeFileSync(path.join(targetDir, 'esquema_tablas.sql'), schemaSql, 'utf-8');
+
+    // 5. Extracción de Datos
     let totalRowsAll = 0;
     const summaryLines = [
-      `=== RESUMEN DE RESPALDO SUPABASE ===`,
+      `=== RESUMEN DE RESPALDO TOTAL SUPABASE ===`,
       `Fecha y Hora: ${new Date().toLocaleString('es-MX')}`,
       `Ubicación: ${targetDir}`,
       `Total de tablas: ${tables.length}`,
@@ -176,12 +235,9 @@ async function runBackup() {
     ];
 
     let fullSqlScript = `-- =============================================================\n`;
-    fullSqlScript += `-- RESPALDO COMPLETO (ESQUEMA + DATOS) - SUPABASE\n`;
+    fullSqlScript += `-- RESPALDO MAESTRO COMPLETO (ESQUEMA + DATOS) - SUPABASE\n`;
     fullSqlScript += `-- Generado: ${new Date().toISOString()}\n`;
-    fullSqlScript += `-- Para restaurar: Copia y pega en Supabase SQL Editor\n`;
     fullSqlScript += `-- =============================================================\n\n`;
-
-    // Primero incluir el esquema en el script de restauración maestro
     fullSqlScript += schemaSql;
     fullSqlScript += `-- =============================================================\n`;
     fullSqlScript += `-- INSERCIÓN DE DATOS DE TODAS LAS TABLAS\n`;
@@ -189,16 +245,13 @@ async function runBackup() {
 
     for (const tableName of tables) {
       process.stdout.write(`⏳ Respaldando tabla "${tableName}"... `);
-
       const dataRes = await client.query(`SELECT * FROM "${tableName}"`);
       const rows = dataRes.rows;
       totalRowsAll += rows.length;
 
-      // Guardar JSON individual
       const jsonPath = path.join(targetDir, `${tableName}.json`);
       fs.writeFileSync(jsonPath, JSON.stringify(rows, null, 2), 'utf-8');
 
-      // Generar sentencias SQL INSERT
       fullSqlScript += `-- -------------------------------------------------------------\n`;
       fullSqlScript += `-- Datos: ${tableName} (${rows.length} registros)\n`;
       fullSqlScript += `-- -------------------------------------------------------------\n`;
@@ -220,7 +273,53 @@ async function runBackup() {
       summaryLines.push(` - ${tableName.padEnd(20)}: ${String(rows.length).padStart(6)} registros (${sizeKB} KB)`);
     }
 
-    // Guardar archivo SQL maestro
+    // 6. Respaldar Usuarios de Auth
+    try {
+      const usersRes = await client.query('SELECT id, email, created_at, last_sign_in_at FROM auth.users ORDER BY created_at ASC;');
+      fs.writeFileSync(path.join(targetDir, 'auth_users.json'), JSON.stringify(usersRes.rows, null, 2), 'utf-8');
+      summaryLines.push(` - auth.users          : ${String(usersRes.rows.length).padStart(6)} usuarios`);
+      console.log(`👤 Usuarios Auth respaldados: ${usersRes.rows.length}`);
+    } catch (eAuth) {}
+
+    // 7. Respaldar Archivos de Supabase Storage (Bundles de actualización)
+    try {
+      const storageObjs = await client.query('SELECT name, bucket_id, metadata FROM storage.objects;');
+      if (storageObjs.rows.length > 0) {
+        console.log(`\n📦 Descargando archivos de Supabase Storage (${storageObjs.rows.length} archivos)...`);
+        let totalStorageBytes = 0;
+        for (const obj of storageObjs.rows) {
+          const localFilePath = path.join(targetDir, 'storage', obj.bucket_id, obj.name);
+          try {
+            const bytes = await downloadStorageFile(obj.bucket_id, obj.name, localFilePath);
+            totalStorageBytes += bytes;
+            console.log(`  -> ${obj.bucket_id}/${obj.name} (${(bytes / (1024 * 1024)).toFixed(2)} MB)`);
+          } catch (eDown) {
+            console.warn(`  x Error descargando ${obj.name}: ${eDown.message}`);
+          }
+        }
+        const storageMB = (totalStorageBytes / (1024 * 1024)).toFixed(2);
+        summaryLines.push(` - Supabase Storage    : ${storageObjs.rows.length} archivos (${storageMB} MB)`);
+      }
+    } catch (eStorage) {}
+
+    // 8. Respaldar Claves de Entorno (.env)
+    try {
+      const envPaths = [
+        path.join(__dirname, '..', '.env'),
+        'M:\\Pagina Web\\.env'
+      ];
+      let envBackupContent = `# COPIA DE SEGURIDAD DE VARIABLES DE ENTORNO (${new Date().toLocaleString('es-MX')})\n\n`;
+      for (const p of envPaths) {
+        if (fs.existsSync(p)) {
+          envBackupContent += `### ARCHIVO: ${p}\n`;
+          envBackupContent += fs.readFileSync(p, 'utf-8') + '\n\n';
+        }
+      }
+      fs.writeFileSync(path.join(targetDir, 'variables_entorno.txt'), envBackupContent, 'utf-8');
+      summaryLines.push(` - Variables de entorno: variables_entorno.txt`);
+    } catch (eEnv) {}
+
+    // Guardar SQL maestro
     const sqlPath = path.join(targetDir, `restaurar_completo.sql`);
     fs.writeFileSync(sqlPath, fullSqlScript, 'utf-8');
     const sqlStats = fs.statSync(sqlPath);
@@ -228,22 +327,19 @@ async function runBackup() {
 
     summaryLines.push(`---------------------------------------`);
     summaryLines.push(`Total de registros: ${totalRowsAll}`);
-    summaryLines.push(`Esquema de tablas: esquema_tablas.sql`);
     summaryLines.push(`Archivo SQL de restauración: restaurar_completo.sql (${sqlSizeMB} MB)`);
     summaryLines.push(`Tiempo total: ${((Date.now() - startTime) / 1000).toFixed(2)}s`);
 
-    // Guardar resumen
     fs.writeFileSync(path.join(targetDir, 'resumen_respaldo.txt'), summaryLines.join('\n'), 'utf-8');
 
-    // Actualizar indicador de último respaldo en la raíz
     fs.writeFileSync(path.join(BASE_BACKUP_DIR, 'ultimo_respaldo.txt'), `Último respaldo realizado con éxito el:\n${new Date().toLocaleString('es-MX')}\nCarpeta: ${targetDir}\nTotal registros: ${totalRowsAll}`, 'utf-8');
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log('\n================================================================');
-    console.log(`🎉 ¡RESPALDO COMPLETADO CON ÉXITO EN ${duration} SEGUNDOS!`);
-    console.log(`📐 Esquema (Schema Visualizer): esquema_tablas.sql`);
-    console.log(`📦 Registros totales respaldados: ${totalRowsAll}`);
-    console.log(`💾 Restauración completa (Esquema + Datos): restaurar_completo.sql (${sqlSizeMB} MB)`);
+    console.log(`🎉 ¡RESPALDO TOTAL COMPLETADO CON ÉXITO EN ${duration} SEGUNDOS!`);
+    console.log(`📐 Esquema, Índices, Triggers y RLS: esquema_tablas.sql`);
+    console.log(`📦 Registros de base de datos: ${totalRowsAll}`);
+    console.log(`💾 Archivo SQL de restauración: restaurar_completo.sql (${sqlSizeMB} MB)`);
     console.log(`📁 Carpeta: ${targetDir}`);
     console.log('================================================================');
 
