@@ -41,10 +41,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function extractFromPelisSeriesHoy(ttId) {
   const playerUrl = ttId.startsWith('http') ? ttId : `https://player.pelisserieshoy.com/f/${ttId}`;
   const resPlayer = await httpsRequest(playerUrl, { headers: { 'Referer': 'https://sololatino.net/' } });
-  if (resPlayer.statusCode !== 200) throw new Error(`HTTP ${resPlayer.statusCode}`);
-  const tok = resPlayer.data.match(/const\s+_t\s*=\s*['"]([a-f0-9]+)['"]/)[1];
-  const qk = JSON.parse(resPlayer.data.match(/var\s+_qk\s*=\s*(\[[^\]]+\]);/)[1]);
-  const qc = resPlayer.data.match(/var\s+_qc\s*=\s*['"]([^'"]+)['"]/)[1];
+  
+  const tokMatch = resPlayer.data && resPlayer.data.match(/const\s+_t\s*=\s*['"]([a-f0-9]+)['"]/);
+  const qkMatch = resPlayer.data && resPlayer.data.match(/var\s+_qk\s*=\s*(\[[^\]]+\]);/);
+  const qcMatch = resPlayer.data && resPlayer.data.match(/var\s+_qc\s*=\s*['"]([^'"]+)['"]/);
+
+  if (!tokMatch || !qkMatch || !qcMatch) {
+    throw new Error(`Tokens no encontrados en playerUrl (HTTP ${resPlayer.statusCode})`);
+  }
+
+  const tok = tokMatch[1];
+  const qk = JSON.parse(qkMatch[1]);
+  const qc = qcMatch[1];
   const qv = qk[1] + qk[3] + qk[0] + qk[2];
   const qt = fnv1a(qv + '|clk|' + qc);
 
@@ -102,6 +110,7 @@ export default async function handler(req, res) {
   }
 
   let directUrl = null;
+  let fallbackError = null;
 
   if (targetPage) {
     // Normalizar: limpiar sufijos de formato y convertir enlaces directos a página permanente
@@ -141,6 +150,7 @@ export default async function handler(req, res) {
     try {
       directUrl = await extractFromPelisSeriesHoy(identifier);
     } catch (errPelis) {
+      fallbackError = errPelis.message;
       console.warn('Fallback pelisserieshoy failed:', errPelis.message);
     }
   }
@@ -152,7 +162,8 @@ export default async function handler(req, res) {
 
   if (!directUrl) {
     return res.status(404).json({
-      error: 'No se pudo resolver el enlace de descarga de Mediafire ni por resolver directo ni por fallback.'
+      error: 'No se pudo resolver el enlace de descarga de Mediafire.',
+      fallback_error: fallbackError
     });
   }
 
