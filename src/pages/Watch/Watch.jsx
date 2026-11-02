@@ -60,8 +60,8 @@ const sortServersByPriority = (srvList) => {
     if (!isA_mp4 && isB_mp4) return 1;
 
     // 2. Streams HLS adaptativos (.m3u8) de segundo (#2)
-    const isA_hls = a.url?.includes('.m3u8') || a.url?.includes('streamproxy') || a.url?.includes('.p3x8') || a.name?.toUpperCase().includes('ARCANDO');
-    const isB_hls = b.url?.includes('.m3u8') || b.url?.includes('streamproxy') || b.url?.includes('.p3x8') || b.name?.toUpperCase().includes('ARCANDO');
+    const isA_hls = a.url?.includes('.m3u8') || a.url?.includes('streamproxy') || a.url?.includes('.p3x8') || a.name?.toUpperCase().includes('ARCANDO') || (a.url?.includes('/api/okru') && !a.url?.includes('&q='));
+    const isB_hls = b.url?.includes('.m3u8') || b.url?.includes('streamproxy') || b.url?.includes('.p3x8') || b.name?.toUpperCase().includes('ARCANDO') || (b.url?.includes('/api/okru') && !b.url?.includes('&q='));
     if (isA_hls && !isB_hls) return -1;
     if (!isA_hls && isB_hls) return 1;
 
@@ -367,7 +367,7 @@ const Watch = () => {
       (streamUrl && /streamproxy|\.p3x8|arcando/i.test(streamUrl)) ||
       (activeServer?.name && /arcando/i.test(activeServer.name))
     );
-    const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('streamproxy') || streamUrl.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name));
+    const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('streamproxy') || streamUrl.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || (streamUrl.includes('/api/okru') && !streamUrl.includes('&q='));
 
     if (isHls) {
       const video = nativeVideoRef.current;
@@ -1119,12 +1119,12 @@ const Watch = () => {
                         )}
                       </>
                     )
-                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name))) ? (
+                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU') ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
                         key={activeServer.url}
-                        src={(activeServer.url?.includes('.m3u8') || activeServer.url?.includes('streamproxy') || activeServer.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name))) ? undefined : activeServer.url} 
+                        src={(activeServer.url?.includes('.m3u8') || activeServer.url?.includes('streamproxy') || activeServer.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || (activeServer.url?.includes('/api/okru') && !activeServer.url?.includes('&q='))) ? undefined : activeServer.url} 
                         controls={controlsVisible}
                         playsInline
                         webkit-playsinline="true"
@@ -1253,7 +1253,7 @@ const Watch = () => {
                 <span>{cinemaMode ? 'Encender luz' : 'Apagar luz'}</span>
               </button>
               
-              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video'))) && (
+              {(activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU') && (
                 <>
                   <button onClick={handleDoubleClick} className={styles.toolbarBtn} title="Pantalla Completa">
                     <Maximize size={18} />
@@ -1287,7 +1287,7 @@ const Watch = () => {
                 </>
               )}
 
-              {isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+              {isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z') || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU') && (
                 <button 
                   onClick={() => setShowAdminPanel(!showAdminPanel)} 
                   className={styles.toolbarBtn} 
@@ -1298,7 +1298,7 @@ const Watch = () => {
               )}
             </div>
 
-            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z')) && (
+            {showAdminPanel && isAdmin && (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire') || (activeServer?.url?.includes('facebook.com') && !activeServer.url.includes('plugins/video')) || activeServer?.name?.includes('Multi - Audio Z') || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU') && (
               <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-dark-secondary)', borderRadius: 'var(--border-radius-lg)', border: '1px solid #ef4444' }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#f8fafc', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>⚙️</span> Panel de Control Admin - Tiempos
