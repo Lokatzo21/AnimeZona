@@ -92,9 +92,55 @@ export default async function handler(req, res) {
     // MODO 1: PROXY DE STREAM DE VIDEO (Cuando el reproductor solicita una calidad)
     // -------------------------------------------------------------------------
     if (qualityParam) {
-      const targetVideo = videos.find(v => v.name.toLowerCase() === qualityParam);
+      const QUALITY_ORDER = ['ultra', 'quad', 'full', 'hd', 'sd', 'low', 'lowest'];
+      const ALIAS_MAP = {
+        '4k': 'ultra',
+        '2160': 'ultra',
+        '2160p': 'ultra',
+        '2k': 'quad',
+        '1440': 'quad',
+        '1440p': 'quad',
+        '1080': 'full',
+        '1080p': 'full',
+        'fhd': 'full',
+        '720': 'hd',
+        '720p': 'hd',
+        '480': 'sd',
+        '480p': 'sd',
+        '360': 'low',
+        '360p': 'low',
+        '240': 'lowest',
+        '240p': 'lowest',
+        'max': 'ultra',
+        'best': 'ultra',
+        'auto': 'ultra'
+      };
+
+      const normalizedQ = ALIAS_MAP[qualityParam] || qualityParam;
+      let targetVideo = videos.find(v => v.name.toLowerCase() === normalizedQ);
+
+      // Si la calidad exacta no está en el video (ej: ultra en un video que solo tiene 1080p o 720p),
+      // auto-degradar a la mejor calidad disponible hacia abajo para que NUNCA arroje 404
+      if (!targetVideo) {
+        const startIndex = QUALITY_ORDER.indexOf(normalizedQ);
+        if (startIndex >= 0) {
+          for (let i = startIndex; i < QUALITY_ORDER.length; i++) {
+            const fallbackName = QUALITY_ORDER[i];
+            const found = videos.find(v => v.name.toLowerCase() === fallbackName);
+            if (found && found.url) {
+              targetVideo = found;
+              break;
+            }
+          }
+        }
+        // Fallback final: primer video disponible
+        if (!targetVideo && videos.length > 0) {
+          targetVideo = videos[0];
+        }
+      }
+
       if (!targetVideo || !targetVideo.url) {
-        return res.status(404).json({ error: `Calidad "${qualityParam}" no disponible para este video.` });
+        return res.status(404).json({ error: `Video no disponible en OK.ru para esta resolución.` });
       }
 
       // Si se pide redirección 302 directa
