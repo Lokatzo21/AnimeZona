@@ -143,13 +143,20 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: `Video no disponible en OK.ru para esta resolución.` });
       }
 
-      // Si se pide redirección 302 directa
-      if (query.redirect === '1' || query.redirect === 'true') {
-        res.writeHead(302, { 'Location': targetVideo.url, 'Access-Control-Allow-Origin': '*' });
+      // Redirección HTTP 302 directa por defecto (Crucial para Vercel Serverless:
+      // evita timeouts de 10s, no consume ancho de banda de Vercel y permite a Roku y Web
+      // reproducir a máxima velocidad directamente desde el CDN de OK.ru con soporte HTTP 206).
+      // Solo se usa proxy si se especifica explícitamente proxy=1 o proxy=true.
+      if (query.proxy !== '1' && query.proxy !== 'true') {
+        res.writeHead(302, {
+          'Location': targetVideo.url,
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=3600'
+        });
         return res.end();
       }
 
-      // Proxy con streaming de rangos (Range HTTP 206)
+      // Proxy con streaming de rangos (Range HTTP 206) - Solo para casos específicos con proxy=1
       const u = new URL(targetVideo.url);
       const upstreamHeaders = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
