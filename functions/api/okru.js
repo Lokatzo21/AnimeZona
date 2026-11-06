@@ -86,8 +86,8 @@ export async function onRequest(context) {
 
     const videos = meta.videos || [];
 
-    // MODO 1: REDIRECCIÓN A CALIDAD ESPECÍFICA
-    if (qualityParam) {
+    // MODO 1: PROXY DIRECTO DE STREAM DE VIDEO MP4 CON RANGE Y REFERER
+    if (qualityParam || urlObj.searchParams.has('play') || format === 'stream') {
       const QUALITY_ORDER = ['ultra', 'quad', 'full', 'hd', 'sd', 'low', 'lowest'];
       const ALIAS_MAP = {
         '4k': 'ultra', '2160': 'ultra', '2160p': 'ultra',
@@ -97,10 +97,10 @@ export async function onRequest(context) {
         '480': 'sd', '480p': 'sd',
         '360': 'low', '360p': 'low',
         '240': 'lowest', '240p': 'lowest',
-        'max': 'ultra', 'best': 'ultra', 'auto': 'ultra'
+        'max': 'ultra', 'best': 'ultra', 'auto': 'full'
       };
 
-      const normalizedQ = ALIAS_MAP[qualityParam] || qualityParam;
+      const normalizedQ = ALIAS_MAP[qualityParam || 'auto'] || qualityParam || 'full';
       let targetVideo = videos.find(v => v.name.toLowerCase() === normalizedQ);
 
       if (!targetVideo) {
@@ -121,7 +121,36 @@ export async function onRequest(context) {
         });
       }
 
-      return Response.redirect(targetVideo.url, 302);
+      // Reenviar peticion de stream con Referer y Range a la CDN de OK.ru
+      const clientRange = request.headers.get('Range') || request.headers.get('range');
+      const streamHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://ok.ru/',
+        'Accept': '*/*'
+      };
+      if (clientRange) {
+        streamHeaders['Range'] = clientRange;
+      }
+
+      const streamRes = await fetch(targetVideo.url, {
+        headers: streamHeaders,
+        redirect: 'follow'
+      });
+
+      const responseHeaders = new Headers();
+      responseHeaders.set('Content-Type', streamRes.headers.get('Content-Type') || 'video/mp4');
+      responseHeaders.set('Accept-Ranges', 'bytes');
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      responseHeaders.set('Access-Control-Allow-Headers', '*');
+      responseHeaders.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+      if (streamRes.headers.has('Content-Range')) responseHeaders.set('Content-Range', streamRes.headers.get('Content-Range'));
+      if (streamRes.headers.has('Content-Length')) responseHeaders.set('Content-Length', streamRes.headers.get('Content-Length'));
+
+      return new Response(streamRes.body, {
+        status: streamRes.status,
+        headers: responseHeaders
+      });
     }
 
     const origin = urlObj.origin;

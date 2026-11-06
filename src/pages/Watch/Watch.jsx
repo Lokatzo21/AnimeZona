@@ -176,6 +176,10 @@ const Watch = () => {
   const [resolvedMfUrl, setResolvedMfUrl] = useState(null);
   const [mfLoading, setMfLoading] = useState(false);
 
+  // OKRU states
+  const [resolvedOkruUrl, setResolvedOkruUrl] = useState(null);
+  const [okruLoading, setOkruLoading] = useState(false);
+
   useEffect(() => {
     if (user) {
       api.isAdmin(user.email).then(setIsAdmin);
@@ -357,6 +361,29 @@ const Watch = () => {
           setPlaybackError(true);
         })
         .finally(() => setMfLoading(false));
+    }
+
+    // Auto-resolver OKRU: Obtiene stream proxy nativo sin bloqueos ni publicidad
+    const okruMatch = activeServer?.url?.match(/ok\.ru\/(?:video|videoembed)\/(\d+)/i) ||
+                      activeServer?.url?.match(/\/api\/okru\?id=(\d+)/i) ||
+                      (activeServer?.server_name === 'OKRU' && activeServer?.url?.match(/(\d{6,})/));
+    const isOkru = Boolean(
+      okruMatch ||
+      (activeServer?.name && /okru/i.test(activeServer.name)) ||
+      (activeServer?.server_name && /okru/i.test(activeServer.server_name))
+    );
+
+    if (isOkru) {
+      const okId = okruMatch ? okruMatch[1] : activeServer.url.match(/(\d{6,})/)?.[1];
+      if (okId) {
+        setOkruLoading(true);
+        setResolvedOkruUrl(`/api/okru?id=${okId}&q=auto`);
+        setOkruLoading(false);
+      } else {
+        setResolvedOkruUrl(null);
+      }
+    } else {
+      setResolvedOkruUrl(null);
     }
   }, [activeServer]);
 
@@ -1138,12 +1165,12 @@ const Watch = () => {
                         </div>
                       </div>
                     )
-                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU') ? (
+                  ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU' || activeServer?.url?.includes('ok.ru') || (activeServer?.name && /okru/i.test(activeServer.name))) ? (
                     <>
                       <video 
                         ref={nativeVideoRef}
-                        key={activeServer.url}
-                        src={(activeServer.url?.includes('.m3u8') || activeServer.url?.includes('streamproxy') || activeServer.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || (activeServer.url?.includes('/api/okru') && !activeServer.url?.includes('&q='))) ? undefined : activeServer.url} 
+                        key={resolvedOkruUrl || activeServer.url}
+                        src={resolvedOkruUrl ? resolvedOkruUrl : ((activeServer.url?.includes('.m3u8') || activeServer.url?.includes('streamproxy') || activeServer.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || (activeServer.url?.includes('/api/okru') && !activeServer.url?.includes('&q='))) ? undefined : activeServer.url)} 
                         controls={controlsVisible}
                         playsInline
                         webkit-playsinline="true"
@@ -1265,6 +1292,44 @@ const Watch = () => {
                       >
                         Abrir en Mediafire
                       </a>
+                    </div>
+                  ) : (activeServer?.url?.includes('ok.ru') || (activeServer?.name && /okru/i.test(activeServer.name)) || (activeServer?.server_name && /okru/i.test(activeServer.server_name))) ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      backgroundColor: '#0f172a',
+                      color: '#fff',
+                      padding: '24px',
+                      textAlign: 'center'
+                    }}>
+                      <h3 style={{ fontSize: '1.3rem', marginBottom: '10px', color: '#f87171' }}>Servidor OK.RU</h3>
+                      <p style={{ maxWidth: '500px', marginBottom: '16px', color: '#94a3b8', fontSize: '0.95rem' }}>
+                        OK.RU bloquea la incrustación dentro de iframes por seguridad (ERR_BLOCKED_BY_RESPONSE). Puedes reintentar con el reproductor nativo o abrirlo directamente:
+                      </p>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => {
+                            const m = activeServer.url.match(/video(?:embed)?\/(\d+)/i) || activeServer.url.match(/(\d{6,})/);
+                            if (m && m[1]) {
+                              setResolvedOkruUrl(`/api/okru?id=${m[1]}&q=auto`);
+                            }
+                          }}
+                          style={{ background: '#ff3d00', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          Reintentar Stream Nativo
+                        </button>
+                        <a 
+                          href={activeServer.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          style={{ background: '#ea580c', color: '#fff', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}
+                        >
+                          Abrir en OK.RU
+                        </a>
+                      </div>
                     </div>
                   ) : (
                     <iframe 
