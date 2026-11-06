@@ -2,7 +2,30 @@ const fs = require('fs');
 const path = require('path');
 const { Client } = require('./node_modules/pg');
 
-const DB_CONN = 'postgresql://postgres:M@nuel21M@xMel&&Negra@db.xmlobzzlszwprjtrkicv.supabase.co:5432/postgres';
+// Cargar variables de entorno desde .env de forma segura
+function loadEnv() {
+  const envPath = path.resolve(__dirname, '../.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        const k = trimmed.slice(0, eqIdx).trim();
+        const v = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[k]) process.env[k] = v;
+      }
+    }
+  }
+}
+loadEnv();
+
+const DB_CONN = process.env.SUPABASE_DB_URL;
+if (!DB_CONN) {
+  console.error('ERROR: SUPABASE_DB_URL no configurada en .env');
+  process.exit(1);
+}
 const BASE_BACKUP_DIR = 'M:\\BD STREAMING';
 const SUPABASE_STORAGE_BASE = 'https://xmlobzzlszwprjtrkicv.supabase.co/storage/v1/object/public';
 
