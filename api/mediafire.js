@@ -83,6 +83,32 @@ async function extractFromPelisSeriesHoy(ttId) {
 }
 
 export default async function handler(req, res) {
+  // Polyfill de métodos Express/Vercel si se corre en entorno Node puro / Vite
+  if (!res.status) {
+    res.status = function(code) {
+      res.statusCode = code;
+      return res;
+    };
+  }
+  if (!res.json) {
+    res.json = function(data) {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(data));
+      return res;
+    };
+  }
+  if (!res.send) {
+    res.send = function(data) {
+      if (typeof data === 'object') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+      } else {
+        res.end(data);
+      }
+      return res;
+    };
+  }
+
   // Permitir CORS total para Roku, Web y apps externas
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');

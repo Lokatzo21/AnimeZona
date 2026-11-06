@@ -3,7 +3,7 @@ chcp 65001 > nul
 title Respaldador de Base de Datos Supabase - StreamZona
 color 0B
 cls
-cd /d "C:\Users\manue\OneDrive\Documentos\Anime"
+cd /d "%~dp0"
 
 echo ================================================================
 echo        INICIANDO COPIA DE SEGURIDAD DE TODA LA BASE DE DATOS

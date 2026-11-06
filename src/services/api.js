@@ -5841,6 +5841,11 @@ try {
 
 let lastDynamicSyncTime = 0;
 let dynamicSyncPromise = null;
+const DYNAMIC_SYNC_TTL = 30 * 60 * 1000; // 30 min caché para reducir Egress de Supabase a 0
+let cachedCustomAnimes = null;
+let lastCustomAnimesFetch = 0;
+const CUSTOM_ANIMES_TTL = 30 * 60 * 1000; // 30 min caché custom animes
+const episodeServersCache = new Map();
 
 // Clasificador inteligente de contenido: desambigua entre Película, Serie Occidental y Anime
 export const resolveMediaClassification = (row, movData, tvData) => {
@@ -5960,14 +5965,14 @@ const mapDynamicTmdbItem = (tmdbData, isMovie, row) => {
 const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
   const now = Date.now();
   if (dynamicSyncPromise) return dynamicSyncPromise;
-  if (now - lastDynamicSyncTime < 5000) return;
+  if (now - lastDynamicSyncTime < DYNAMIC_SYNC_TTL) return;
 
   dynamicSyncPromise = (async () => {
     try {
       let summaryRows = [];
       const { data: viewData, error: viewErr } = await supabase
         .from('catalog_episodes_summary')
-        .select('*');
+        .select('anime_tmdb_id, search_title, sample_episode_name, total_episodes, max_season, max_id');
 
       if (!viewErr && Array.isArray(viewData) && viewData.length > 0) {
         summaryRows = viewData;
@@ -6085,11 +6090,7 @@ const syncDynamicEpisodesCatalog = async (customAnimes = []) => {
             if (firstHit && firstHit.id) {
               const isMov = !hasMultipleEps && (firstHit.media_type === 'movie' || Boolean(firstHit.title && !firstHit.name));
               resolvedItem = mapDynamicTmdbItem(firstHit, isMov, row);
-              // Vincular automáticamente el anime_tmdb_id en Supabase para futuras consultas
-              supabase.from('anime_episodes')
-                .update({ anime_tmdb_id: String(firstHit.id) })
-                .ilike('search_title', row.search_title)
-                .then(() => {}).catch(() => {});
+              // anime_tmdb_id ya queda resuelto en memoria para el catálogo sin consumir llamadas de escritura
             }
           }
 
@@ -6186,6 +6187,7 @@ export const api = {
         }
       }
 
+      if (api.invalidateCatalogCache) api.invalidateCatalogCache();
       return data;
     } catch (error) {
       console.error('Error adding custom anime:', error);
@@ -6223,6 +6225,7 @@ export const api = {
         }
       }
 
+      if (api.invalidateCatalogCache) api.invalidateCatalogCache();
       return data;
     } catch (error) {
       console.error('Error updating custom anime:', error);
@@ -6324,14 +6327,57 @@ export const api = {
 
   deleteCustomAnime: async (id) => {
      await supabase.from('custom_animes').delete().eq('id', id);
+     if (api.invalidateCatalogCache) api.invalidateCatalogCache();
+  },
+  invalidateCatalogCache: () => {
+     cachedCustomAnimes = null;
+     lastCustomAnimesFetch = 0;
+     lastDynamicSyncTime = 0;
+     episodeServersCache.clear();
+     if (typeof window !== 'undefined') {
+       try {
+         localStorage.removeItem('animezona_cached_custom_animes');
+         localStorage.removeItem('animezona_cached_custom_animes_ts');
+       } catch {}
+     }
   },
   getCustomAnimes: async (includeSecret = false) => {
-     let query = supabase.from('custom_animes').select('*').order('created_at', { ascending: false });
+     const now = Date.now();
+     if (!includeSecret && cachedCustomAnimes && (now - lastCustomAnimesFetch < CUSTOM_ANIMES_TTL)) {
+       return cachedCustomAnimes;
+     }
+
+     if (!includeSecret && !cachedCustomAnimes && typeof window !== 'undefined') {
+       try {
+         const raw = localStorage.getItem('animezona_cached_custom_animes');
+         const ts = Number(localStorage.getItem('animezona_cached_custom_animes_ts') || 0);
+         if (raw && (now - ts < CUSTOM_ANIMES_TTL)) {
+           cachedCustomAnimes = JSON.parse(raw);
+           lastCustomAnimesFetch = ts;
+           return cachedCustomAnimes;
+         }
+       } catch {}
+     }
+
+     let query = supabase.from('custom_animes')
+       .select('id, title, original_title, image, banner_image, description, genres, score, status, content_type, total_episodes, is_movie, is_secret, is_custom, created_at')
+       .order('created_at', { ascending: false });
      if (!includeSecret) {
         query = query.eq('is_secret', false);
      }
      const { data } = await query;
-     return data ? data.map(mapCustomAnime) : [];
+     const mapped = data ? data.map(mapCustomAnime) : [];
+     if (!includeSecret) {
+       cachedCustomAnimes = mapped;
+       lastCustomAnimesFetch = now;
+       if (typeof window !== 'undefined') {
+         try {
+           localStorage.setItem('animezona_cached_custom_animes', JSON.stringify(mapped));
+           localStorage.setItem('animezona_cached_custom_animes_ts', String(now));
+         } catch {}
+       }
+     }
+     return mapped;
   },
   getCatalogAnimes: async (includeSecret = false) => {
      const customAnimes = await api.getCustomAnimes(includeSecret);
@@ -6948,7 +6994,13 @@ export const api = {
   getEpisodeServers: async (animeTitle, episodeId, language = 'sub', animeId = null, seasonNumber = 1) => {
     const cleanTitle = (animeTitle || '').trim();
     const shortTitle = cleanTitle.split(/[:\-\(]/)[0].trim();
+    const cacheKey = `${animeId || cleanTitle}_s${seasonNumber || 1}_e${episodeId}_${language}`;
+    if (episodeServersCache.has(cacheKey)) {
+      return episodeServersCache.get(cacheKey);
+    }
     let serversData = [];
+
+    const serverCols = 'id, server_name, language, video_url, skip_start, skip_end, outro_start, episode_number, season_number';
 
     try {
       // 1. Prioridad: Buscar por anime_tmdb_id si está provisto (ej. '671', '941', '108978', 'custom-...')
@@ -6959,7 +7011,7 @@ export const api = {
         if (seasonNumber) {
           const { data: bySeasonData } = await supabase
             .from('anime_episodes')
-            .select('*')
+            .select(serverCols)
             .eq('anime_tmdb_id', idStr)
             .eq('season_number', seasonNumber)
             .eq('episode_number', episodeId)
@@ -6972,7 +7024,7 @@ export const api = {
 
         // 1b. Fallback por episode_number general
         if (serversData.length === 0) {
-          let q = supabase.from('anime_episodes').select('*').eq('anime_tmdb_id', idStr);
+          let q = supabase.from('anime_episodes').select(serverCols).eq('anime_tmdb_id', idStr);
           if (!idStr.startsWith('custom-')) {
             q = q.eq('episode_number', episodeId);
           }
@@ -6981,7 +7033,7 @@ export const api = {
             serversData = byIdData;
           } else if (!idStr.startsWith('custom-')) {
             // Si no encontró con episode_number específico para película, probar sin filtro de episode_number
-            const { data: anyById } = await supabase.from('anime_episodes').select('*').eq('anime_tmdb_id', idStr);
+            const { data: anyById } = await supabase.from('anime_episodes').select(serverCols).eq('anime_tmdb_id', idStr);
             if (anyById && anyById.length > 0) {
               serversData = anyById;
             }
@@ -6994,7 +7046,7 @@ export const api = {
         if (seasonNumber) {
           const { data: byTitleSeason } = await supabase
             .from('anime_episodes')
-            .select('*')
+            .select(serverCols)
             .ilike('search_title', cleanTitle)
             .eq('season_number', seasonNumber)
             .eq('episode_number', episodeId)
@@ -7008,7 +7060,7 @@ export const api = {
         if (serversData.length === 0) {
           const { data: bySearchTitle } = await supabase
             .from('anime_episodes')
-            .select('*')
+            .select(serverCols)
             .ilike('search_title', cleanTitle)
             .eq('episode_number', episodeId)
             .order('created_at', { ascending: false });
@@ -7018,7 +7070,7 @@ export const api = {
           } else if (shortTitle && shortTitle !== cleanTitle) {
             const { data: byShortSearch } = await supabase
               .from('anime_episodes')
-              .select('*')
+              .select(serverCols)
               .ilike('search_title', shortTitle)
               .eq('episode_number', episodeId)
               .order('created_at', { ascending: false });
@@ -7033,7 +7085,7 @@ export const api = {
       if (serversData.length === 0 && cleanTitle) {
         const { data: byEpName } = await supabase
           .from('anime_episodes')
-          .select('*')
+          .select(serverCols)
           .ilike('episode_name', `%${cleanTitle}%`)
           .order('created_at', { ascending: false });
 
@@ -7042,7 +7094,7 @@ export const api = {
         } else if (shortTitle && shortTitle !== cleanTitle) {
           const { data: byShortName } = await supabase
             .from('anime_episodes')
-            .select('*')
+            .select(serverCols)
             .ilike('episode_name', `%${shortTitle}%`)
             .order('created_at', { ascending: false });
           if (byShortName && byShortName.length > 0) {
@@ -7055,7 +7107,7 @@ export const api = {
       if (serversData.length === 0 && cleanTitle) {
         const { data: broadData } = await supabase
           .from('anime_episodes')
-          .select('*')
+          .select(serverCols)
           .ilike('search_title', `%${cleanTitle}%`)
           .order('created_at', { ascending: false });
         if (broadData && broadData.length > 0) {
@@ -7091,9 +7143,11 @@ export const api = {
           };
         });
 
-        return servers.filter((server, index, self) =>
+        const finalServers = servers.filter((server, index, self) =>
           index === self.findIndex((t) => t.url === server.url)
         );
+        episodeServersCache.set(cacheKey, finalServers);
+        return finalServers;
       }
     } catch (e) {
       console.error("No se pudo obtener el servidor de Supabase", e);

@@ -61,6 +61,32 @@ const QUALITY_PROFILES = {
 };
 
 export default async function handler(req, res) {
+  // Polyfill de métodos Express/Vercel si se corre en entorno Node puro / Vite
+  if (!res.status) {
+    res.status = function(code) {
+      res.statusCode = code;
+      return res;
+    };
+  }
+  if (!res.json) {
+    res.json = function(data) {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(data));
+      return res;
+    };
+  }
+  if (!res.send) {
+    res.send = function(data) {
+      if (typeof data === 'object') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+      } else {
+        res.end(data);
+      }
+      return res;
+    };
+  }
+
   // CORS universal para Roku, Smart TV, Web y Móvil
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
@@ -210,8 +236,9 @@ export default async function handler(req, res) {
     // MODO 2: JSON DE INFORMACIÓN (Si se pide ?format=json)
     // -------------------------------------------------------------------------
     if (query.format === 'json') {
-      const proto = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const headers = req.headers || {};
+      const proto = headers['x-forwarded-proto'] || 'https';
+      const host = headers['x-forwarded-host'] || headers.host || 'localhost';
       const baseUrl = `${proto}://${host}/api/okru?id=${videoId}`;
 
       return res.status(200).json({

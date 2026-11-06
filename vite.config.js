@@ -1,13 +1,69 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import mediafireHandler from './api/mediafire.js'
+import okruHandler from './api/okru.js'
 
-function fbExtractorPlugin() {
+function decorateResponse(res) {
+  if (!res.status) {
+    res.status = function(code) {
+      res.statusCode = code;
+      return res;
+    };
+  }
+  if (!res.json) {
+    res.json = function(data) {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(data));
+      return res;
+    };
+  }
+  if (!res.send) {
+    res.send = function(data) {
+      if (typeof data === 'object') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+      } else {
+        res.end(data);
+      }
+      return res;
+    };
+  }
+  return res;
+}
+
+function localApiPlugin() {
   return {
-    name: 'fb-extractor',
+    name: 'local-api-handler',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (req.url.startsWith('/api/extract-fb')) {
-          const urlObj = new URL(req.url, 'http://localhost');
+        const urlObj = new URL(req.url, 'http://localhost');
+        req.query = Object.fromEntries(urlObj.searchParams.entries());
+        decorateResponse(res);
+
+        // 1. Mediafire Local Resolver (0 dependencia de Vercel)
+        if (urlObj.pathname.startsWith('/api/mediafire')) {
+          try {
+            await mediafireHandler(req, res);
+          } catch (e) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: e.message }));
+          }
+          return;
+        }
+
+        // 2. OKRU Local Resolver (0 dependencia de Vercel)
+        if (urlObj.pathname.startsWith('/api/okru')) {
+          try {
+            await okruHandler(req, res);
+          } catch (e) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: e.message }));
+          }
+          return;
+        }
+
+        // 3. Facebook Extractor Local
+        if (urlObj.pathname.startsWith('/api/extract-fb')) {
           const fbUrl = urlObj.searchParams.get('url');
           if (!fbUrl) {
             res.statusCode = 400;
@@ -44,6 +100,7 @@ function fbExtractorPlugin() {
           }
           return;
         }
+
         next();
       });
     }
@@ -52,15 +109,8 @@ function fbExtractorPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), fbExtractorPlugin()],
+  plugins: [react(), localApiPlugin()],
   server: {
-    proxy: {
-      '/api': {
-        target: 'https://animezona.vercel.app',
-        changeOrigin: true,
-        secure: false
-      }
-    },
     watch: {
       ignored: ['**/scraper/**']
     }

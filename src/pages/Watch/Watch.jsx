@@ -321,7 +321,9 @@ const Watch = () => {
     // Auto-resolver Mediafire: Obtiene enlace fresco en tiempo real
     const isMfDirectCdn = activeServer?.url && /https?:\/\/download\d+\.mediafire\.com/i.test(activeServer.url);
     const isMf = activeServer && activeServer.url && (
+      activeServer.name === 'MEDIAFIRE' ||
       activeServer.server_name === 'MEDIAFIRE' ||
+      activeServer.name === 'MEDIAFIRE DIRECTO' ||
       activeServer.server_name === 'MEDIAFIRE DIRECTO' ||
       activeServer.url.includes('mediafire.com') ||
       activeServer.url.includes('/api/mediafire')
@@ -337,15 +339,23 @@ const Watch = () => {
         : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
 
       fetch(apiUrl)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
         .then(data => {
           if (data.success && data.stream_url) {
             setResolvedMfUrl(data.stream_url);
           } else {
-            setResolvedMfUrl(activeServer.url);
+            setResolvedMfUrl(null);
+            setPlaybackError(true);
           }
         })
-        .catch(() => setResolvedMfUrl(activeServer.url))
+        .catch((err) => {
+          console.warn("[Mediafire Resolve] Error:", err);
+          setResolvedMfUrl(null);
+          setPlaybackError(true);
+        })
         .finally(() => setMfLoading(false));
     }
   }, [activeServer]);
@@ -1004,15 +1014,20 @@ const Watch = () => {
                     ) : (
                       <div className={styles.loadingServer}>Hubo un error extrayendo el video de Facebook. URL recibida: {activeServer.url}</div>
                     )
-                  ) : (activeServer?.server_name === 'MEDIAFIRE' || activeServer?.url?.includes('mediafire.com') || activeServer?.url?.includes('/api/mediafire')) ? (
+                  ) : (activeServer?.name === 'MEDIAFIRE' || activeServer?.server_name === 'MEDIAFIRE' || activeServer?.name === 'MEDIAFIRE DIRECTO' || activeServer?.server_name === 'MEDIAFIRE DIRECTO' || activeServer?.url?.includes('mediafire.com') || activeServer?.url?.includes('/api/mediafire')) ? (
                     mfLoading ? (
-                      <div className={styles.loadingServer}>Conectando con Mediafire... (Generando stream fresco)</div>
-                    ) : (
+                      <div className={styles.loadingServer}>
+                        <div style={{ textAlign: 'center' }}>
+                          <p style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Conectando con Mediafire...</p>
+                          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Generando stream MP4 directo sin publicidad</span>
+                        </div>
+                      </div>
+                    ) : (resolvedMfUrl && !playbackError) ? (
                       <>
                         <video 
                           ref={nativeVideoRef}
-                          key={resolvedMfUrl || activeServer.url}
-                          src={resolvedMfUrl || activeServer.url} 
+                          key={resolvedMfUrl}
+                          src={resolvedMfUrl} 
                           controls={controlsVisible}
                           playsInline
                           webkit-playsinline="true"
@@ -1027,74 +1042,11 @@ const Watch = () => {
                           onPlaying={() => { setPlaybackError(false); handleVideoPlaying(); }}
                           onError={(e) => {
                             console.warn("Mediafire stream load error, verificando si se puede refrescar:", e);
-                            if (activeServer.url.includes('/api/mediafire') || activeServer.url.includes('mediafire.com/file/')) {
-                              const apiUrl = activeServer.url.includes('/api/mediafire')
-                                ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
-                                : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
-                              fetch(apiUrl)
-                                .then(r => r.json())
-                                .then(d => {
-                                  if (d.success && d.stream_url && d.stream_url !== resolvedMfUrl) {
-                                    setResolvedMfUrl(d.stream_url);
-                                  } else {
-                                    setPlaybackError(true);
-                                  }
-                                })
-                                .catch(() => setPlaybackError(true));
-                            } else {
-                              setPlaybackError(true);
-                            }
+                            setPlaybackError(true);
                           }}
                           onDoubleClick={handleDoubleClick}
                           onClick={() => { if(!controlsVisible) { nativeVideoRef.current?.paused ? nativeVideoRef.current.play() : nativeVideoRef.current.pause() } }}
                         ></video>
-                        {playbackError && (
-                          <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: 'rgba(0,0,0,0.85)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 10,
-                            color: '#fff',
-                            padding: '20px',
-                            textAlign: 'center'
-                          }}>
-                            <p style={{fontSize: '1.2rem', marginBottom: '15px'}}>No se pudo cargar el stream de Mediafire.</p>
-                            <button 
-                              onClick={() => {
-                                setPlaybackError(false);
-                                setMfLoading(true);
-                                const apiUrl = activeServer.url.includes('/api/mediafire')
-                                  ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
-                                  : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
-                                fetch(apiUrl)
-                                  .then(r => r.json())
-                                  .then(d => {
-                                    if (d.success && d.stream_url) setResolvedMfUrl(d.stream_url);
-                                  })
-                                  .finally(() => setMfLoading(false));
-                              }}
-                              style={{
-                                background: '#ff3d00',
-                                color: '#fff',
-                                border: 'none',
-                                padding: '10px 24px',
-                                borderRadius: '8px',
-                                fontSize: '1rem',
-                                fontWeight: 'bold',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Reintentar Reproducción
-                            </button>
-                          </div>
-                        )}
                         {showSkipIntro && (
                           <button onClick={skipIntro} className={styles.skipIntroBtn}>
                             <SkipForward size={20} /> Saltar Intro
@@ -1118,6 +1070,73 @@ const Watch = () => {
                           </div>
                         )}
                       </>
+                    ) : (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        backgroundColor: '#0f172a',
+                        color: '#fff',
+                        padding: '24px',
+                        textAlign: 'center'
+                      }}>
+                        <h3 style={{fontSize: '1.3rem', marginBottom: '10px', color: '#f87171'}}>Servidor Mediafire</h3>
+                        <p style={{maxWidth: '520px', marginBottom: '18px', color: '#94a3b8', fontSize: '0.92rem', lineHeight: '1.4'}}>
+                          No se pudo generar el stream directo en este momento. Por políticas de seguridad, Mediafire no permite incrustarse en frames de terceros (ERR_BLOCKED_BY_RESPONSE), pero puedes descargarlo o abrirlo en una nueva pestaña:
+                        </p>
+                        <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center'}}>
+                          <button 
+                            onClick={() => {
+                              setPlaybackError(false);
+                              setMfLoading(true);
+                              const apiUrl = activeServer.url.includes('/api/mediafire')
+                                ? (activeServer.url.includes('?') ? `${activeServer.url}&format=json` : `${activeServer.url}?format=json`)
+                                : `/api/mediafire?url=${encodeURIComponent(activeServer.url)}&format=json`;
+                              fetch(apiUrl)
+                                .then(r => r.json())
+                                .then(d => {
+                                  if (d.success && d.stream_url) {
+                                    setResolvedMfUrl(d.stream_url);
+                                  } else {
+                                    setPlaybackError(true);
+                                  }
+                                })
+                                .catch(() => setPlaybackError(true))
+                                .finally(() => setMfLoading(false));
+                            }}
+                            style={{
+                              background: '#ff3d00',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              fontSize: '0.95rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Reintentar Conexión
+                          </button>
+                          <a 
+                            href={activeServer.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              background: '#2563eb',
+                              color: '#fff',
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              fontSize: '0.95rem',
+                              fontWeight: 'bold',
+                              textDecoration: 'none'
+                            }}
+                          >
+                            Abrir en Mediafire (Descargar)
+                          </a>
+                        </div>
+                      </div>
                     )
                   ) : (activeServer?.url?.includes('.mp4') || activeServer?.url?.includes('.m3u8') || activeServer?.url?.includes('streamproxy') || activeServer?.url?.includes('.p3x8') || (activeServer?.name && /arcando/i.test(activeServer.name)) || activeServer?.url?.includes('/api/okru') || activeServer?.server_name === 'OKRU') ? (
                     <>
@@ -1221,6 +1240,31 @@ const Watch = () => {
                         <a href={activeServer.url} target="_blank" rel="noopener noreferrer" style={{background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold'}}>
                             Ir a Descargar
                         </a>
+                    </div>
+                  ) : activeServer?.url?.includes('mediafire.com') ? (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      backgroundColor: '#0f172a',
+                      color: '#fff',
+                      padding: '24px',
+                      textAlign: 'center'
+                    }}>
+                      <h3 style={{ fontSize: '1.3rem', marginBottom: '10px', color: '#f87171' }}>Servidor Mediafire</h3>
+                      <p style={{ maxWidth: '500px', marginBottom: '16px', color: '#94a3b8', fontSize: '0.95rem' }}>
+                        Mediafire bloquea la visualización dentro de iframes por seguridad (ERR_BLOCKED_BY_RESPONSE). Puedes abrirlo directamente para descargar o ver el archivo:
+                      </p>
+                      <a 
+                        href={activeServer.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ background: '#2563eb', color: '#fff', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}
+                      >
+                        Abrir en Mediafire
+                      </a>
                     </div>
                   ) : (
                     <iframe 
