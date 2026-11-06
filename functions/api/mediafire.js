@@ -39,35 +39,60 @@ export async function onRequest(context) {
     pageUrl = `https://www.mediafire.com/file/${mfDirect[1]}/${mfDirect[2]}/file`;
   }
 
-  try {
-    const res = await fetch(pageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+  const browserHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1'
+  };
+
+  const keyMatch = pageUrl.match(/mediafire\.com\/(?:file|download)\/([a-zA-Z0-9]+)/);
+  const qk = keyMatch ? keyMatch[1] : null;
+
+  const candidateUrls = [pageUrl];
+  if (qk) {
+    candidateUrls.push(`https://www.mediafire.com/download/${qk}`);
+    candidateUrls.push(`https://www.mediafire.com/file/${qk}/file`);
+  }
+
+  let directUrl = null;
+  let lastStatus = 0;
+
+  for (const candUrl of candidateUrls) {
+    try {
+      const res = await fetch(candUrl, {
+        headers: browserHeaders,
+        redirect: 'follow'
+      });
+      lastStatus = res.status;
+      if (res.ok) {
+        const html = await res.text();
+        const match = html.match(/aria-label=["']Download file["']\s+href=["']([^"']+)["']/i) ||
+                      html.match(/id=["']downloadButton["']\s+href=["']([^"']+)["']/i) ||
+                      html.match(/href=["'](https?:\/\/download[^"']+)["'][^>]*id=["']downloadButton["']/i) ||
+                      html.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
+        if (match) {
+          directUrl = match[1] || match[0];
+          break;
+        }
       }
+    } catch (e) {
+      // Intentar siguiente candidato
+    }
+  }
+
+  if (!directUrl) {
+    return new Response(JSON.stringify({
+      error: `No se pudo extraer stream directo de Mediafire (HTTP ${lastStatus}). Usa el botón de descarga directa.`
+    }), {
+      status: lastStatus || 404,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
-
-    if (!res.ok) {
-      return new Response(JSON.stringify({ error: `Mediafire devolvió estado ${res.status}` }), {
-        status: res.status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    }
-
-    const html = await res.text();
-    const match = html.match(/aria-label=["']Download file["']\s+href=["']([^"']+)["']/i) ||
-                  html.match(/id=["']downloadButton["']\s+href=["']([^"']+)["']/i) ||
-                  html.match(/href=["'](https?:\/\/download[^"']+)["'][^>]*id=["']downloadButton["']/i) ||
-                  html.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
-
-    if (!match) {
-      return new Response(JSON.stringify({ error: 'No se pudo encontrar el enlace de descarga directa en Mediafire' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    }
-
-    const directUrl = match[1] || match[0];
+  }
     const streamUrl = directUrl.includes('?') ? `${directUrl}&.mp4` : `${directUrl}?.mp4`;
 
     if (format === 'json') {
