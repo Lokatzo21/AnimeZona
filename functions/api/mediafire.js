@@ -62,37 +62,39 @@ export async function onRequest(context) {
   let directUrl = null;
   let lastStatus = 0;
 
-  for (const candUrl of candidateUrls) {
-    try {
-      const res = await fetch(candUrl, {
-        headers: browserHeaders,
-        redirect: 'follow'
-      });
-      lastStatus = res.status;
-      if (res.ok) {
-        const html = await res.text();
-        const match = html.match(/aria-label=["']Download file["']\s+href=["']([^"']+)["']/i) ||
-                      html.match(/id=["']downloadButton["']\s+href=["']([^"']+)["']/i) ||
-                      html.match(/href=["'](https?:\/\/download[^"']+)["'][^>]*id=["']downloadButton["']/i) ||
-                      html.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
-        if (match) {
-          directUrl = match[1] || match[0];
-          break;
+  try {
+    for (const candUrl of candidateUrls) {
+      try {
+        const res = await fetch(candUrl, {
+          headers: browserHeaders,
+          redirect: 'follow'
+        });
+        lastStatus = res.status;
+        if (res.ok) {
+          const html = await res.text();
+          const match = html.match(/aria-label=["']Download file["']\s+href=["']([^"']+)["']/i) ||
+                        html.match(/id=["']downloadButton["']\s+href=["']([^"']+)["']/i) ||
+                        html.match(/href=["'](https?:\/\/download[^"']+)["'][^>]*id=["']downloadButton["']/i) ||
+                        html.match(/https?:\/\/download\d+\.mediafire\.com\/[^\s"']+/i);
+          if (match) {
+            directUrl = match[1] || match[0];
+            break;
+          }
         }
+      } catch (e) {
+        // Intentar siguiente candidato
       }
-    } catch (e) {
-      // Intentar siguiente candidato
     }
-  }
 
-  if (!directUrl) {
-    return new Response(JSON.stringify({
-      error: `No se pudo extraer stream directo de Mediafire (HTTP ${lastStatus}). Usa el botón de descarga directa.`
-    }), {
-      status: lastStatus || 404,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-    });
-  }
+    if (!directUrl) {
+      return new Response(JSON.stringify({
+        error: `No se pudo extraer stream directo de Mediafire (HTTP ${lastStatus}). Usa el botón de descarga directa.`
+      }), {
+        status: lastStatus || 404,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+
     const streamUrl = directUrl.includes('?') ? `${directUrl}&.mp4` : `${directUrl}?.mp4`;
 
     if (format === 'json') {
